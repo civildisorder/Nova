@@ -57,7 +57,7 @@ struct sockaddr* serv_addrPtr = (struct sockaddr *)&serv_addr;
 int len;
 
 u_char data[MAX_MSG_SIZE];
-uint dataLen;
+uint plaintextLen;
 
 int numBytesRead;
 int socketFD;
@@ -128,6 +128,10 @@ int main(int argc,char *argv[])
 
 	suspects.set_empty_key(NULL);
 	suspects.resize(INITIAL_TABLESIZE);
+
+	//Initialize the aes_key struct
+	AES_set_encrypt_key(SAkey,256,&aes_key);
+	AES_set_decrypt_key(SAkey,256,&aes_key);
 
 	int len;
 	struct sockaddr_un localIPCAddress;
@@ -503,7 +507,7 @@ void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 	while(1)
 	{
 		//Do the actual "listen"
-		if ((numbytes = recvfrom(sockfd,buf,bufSize,0,sockaddrPtr,addr_lenPtr)) == -1)
+		if ((numbytes = recvfrom(sockfd, buf, bufSize, 0,sockaddrPtr, addr_lenPtr)) == -1)
 		{
 			LOG4CXX_ERROR(m_logger, "recvfrom: " << strerror(errno));
 			close(sockfd);
@@ -515,12 +519,23 @@ void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 		{
 			continue;
 		}
+		//We expect that the ciphertext should be in blocks of AES_BLOCK_SIZE
+		//	Also, we assume that there must be mroe than one block. (The IV is the first block)
+		if( ((numbytes % AES_BLOCK_SIZE) != 0) && (numbytes > AES_BLOCK_SIZE))
+		{
+			continue;
+		}
+
+		unsigned char *plaintext = (unsigned char *)malloc(numbytes);
+
+		//Decrypt
+		AES_cbc_encrypt(buf + AES_BLOCK_SIZE, plaintext, numbytes, &aes_key, buf, 0);
 
 		suspect = new Suspect();
 
 		try
 		{
-			suspect->deserializeSuspect(buf);
+			suspect->deserializeSuspect(plaintext);
 			bzero(buf, numbytes);
 
 			LOG4CXX_INFO(m_logger,"Received a Silent Alarm!\n" << suspect->ToString());
@@ -542,6 +557,7 @@ void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 			close(sockfd);
 			LOG4CXX_INFO(m_logger,"Error interpreting received Silent Alarm: " << string(e.what()));
 		}
+		free(plaintext);
 		delete suspect;
 		pthread_rwlock_unlock(&lock);
 	}
@@ -898,12 +914,30 @@ string Nova::ClassificationEngine::getLocalIP(const char *dev)
 //Send a silent alarm about the argument suspect
 void Nova::ClassificationEngine::SilentAlarm(Suspect *suspect)
 {
-	dataLen = suspect->serializeSuspect(data);
+	//IV + ciphertext
+	unsigned char *ciphertext;
+	plaintextLen = suspect->serializeSuspect(data);
+
+	uint padding = AES_BLOCK_SIZE - (plaintextLen % AES_BLOCK_SIZE);
+	if( padding == AES_BLOCK_SIZE)
+	{
+		padding  = 0;
+	}
+
+	uint ciphertextLen = AES_BLOCK_SIZE + plaintextLen + padding;
+
+	ciphertext = (unsigned char*)malloc(AES_BLOCK_SIZE + plaintextLen + padding);
+
+	//Put a random IV into the first AES block
+	RAND_bytes(ciphertext, AES_BLOCK_SIZE);
+	//Append the ciphertext to the rest
+	AES_cbc_encrypt(data, ciphertext + AES_BLOCK_SIZE, plaintextLen + padding, &aes_key, ciphertext, 1);
 
 	if ((socketFD = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 	{
 		LOG4CXX_ERROR(m_logger, "socket: " << strerror(errno));
 		close(socketFD);
+		free(ciphertext);
 		return;
 	}
 
@@ -911,13 +945,15 @@ void Nova::ClassificationEngine::SilentAlarm(Suspect *suspect)
 	{
 		LOG4CXX_ERROR(m_logger, "connect: " << strerror(errno));
 		close(socketFD);
+		free(ciphertext);
 		return;
 	}
 
-	if (send(socketFD, data, dataLen, 0) == -1)
+	if (send(socketFD, ciphertext, ciphertextLen, 0) == -1)
 	{
 		LOG4CXX_ERROR(m_logger, "send: " << strerror(errno));
 		close(socketFD);
+		free(ciphertext);
 		return;
 	}
 	close(socketFD);
@@ -927,6 +963,7 @@ void Nova::ClassificationEngine::SilentAlarm(Suspect *suspect)
 	{
 		LOG4CXX_ERROR(m_logger, "socket: " << strerror(errno));
 		close(sockfd);
+		free(ciphertext);
 		return;
 	}
 
@@ -934,15 +971,18 @@ void Nova::ClassificationEngine::SilentAlarm(Suspect *suspect)
 	{
 		LOG4CXX_ERROR(m_logger, "setsockopt - SO_SOCKET: " << strerror(errno));
 		close(sockfd);
+		free(ciphertext);
 		return;
 	}
 
-	if( sendto(sockfd,data,dataLen,0,serv_addrPtr, inSocketSize) == -1)
+	if( sendto(sockfd, ciphertext, ciphertextLen, 0, serv_addrPtr, inSocketSize) == -1)
 	{
 		LOG4CXX_ERROR(m_logger,"Error in UDP Send: " << strerror(errno));
 		close(sockfd);
+		free(ciphertext);
 		return;
 	}
+	free(ciphertext);
 }
 
 ///Receive a TrafficEvent from another local component.
@@ -1182,6 +1222,20 @@ void ClassificationEngine::LoadConfig(char * input)
 				continue;
 			}
 
+			prefix = "AES_SA_KEY";
+			if(!line.substr(0,prefix.size()).compare(prefix))
+			{
+				line = line.substr(prefix.size()+1,line.size());
+				for( uint i = 0; i < KEY_SIZE; i+=2 )
+				{
+					sscanf( line.c_str(), "%2x", SAkey[i] ) ;
+				}
+
+				verify[9]=true;
+
+				continue;
+			}
+
 			prefix = "DATAFILE";
 			if(!line.substr(0,prefix.size()).compare(prefix))
 			{
@@ -1189,7 +1243,7 @@ void ClassificationEngine::LoadConfig(char * input)
 				if(line.size() > 0 && !line.substr(line.size()-4, line.size()).compare(".txt"))
 				{
 					dataFile = line;
-					verify[9]=true;
+					verify[10]=true;
 				}
 				continue;
 			}

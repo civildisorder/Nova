@@ -17,3 +17,5 @@ READ_PCAP 0
 PCAP_FILE pcapfile
 GO_TO_LIVE 1
 USE_TERMINALS 0
+#In hex, a provided 256 bit encryption key
+AES_SA_KEY b9b310257d4a03fd38c13774213063cd08c764fd92a1c548c2e08f1207ab0c70

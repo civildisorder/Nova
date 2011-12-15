@@ -12,6 +12,8 @@
 #include "Suspect.h"
 #include <ANN/ANN.h>
 #include <google/dense_hash_map>
+#include "openssl/aes.h"
+#include "openssl/rand.h"
 
 //TODO: Make Nova create this file on startup or installation.
 ///	Filename of the file to be used as an IPC key
@@ -33,12 +35,21 @@
 //dimension
 #define DIM 9
 //Number of values read from the NOVAConfig file
-#define CONFIG_FILE_LINE_COUNT 10
+#define CONFIG_FILE_LINE_COUNT 11
 //Number of messages to queue in a listening socket before ignoring requests until the queue is open
 #define SOCKET_QUEUE_SIZE 50
+//256 bits, for encryption keys
+#define KEY_SIZE 32
+//128 bits, for AES block size
+#define AES_BLOCK_SIZE 16
 
 //Used in classification algorithm. Store it here so we only need to calculate it once
 const double sqrtDIM = sqrt(DIM);
+
+//Key used for encryption and decryption of Silent Alarm messages
+unsigned char SAkey[KEY_SIZE];
+//The same key, in a form usable by OpenSSL
+AES_KEY aes_key;
 
 //Equality operator used by google's dense hash map
 struct eq
