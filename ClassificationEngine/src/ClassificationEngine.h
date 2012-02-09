@@ -22,9 +22,9 @@
 #include <NovaUtil.h>
 #include <Suspect.h>
 
-//Mode to knock on the silent alarm port
-#define OPEN true
-#define CLOSE false
+//How much to read from a socket per iteration
+//	(loop reads until it's all read)
+#define SOCK_READ_SIZE 4096
 
 //Used in classification algorithm. Store it here so we only need to calculate it once
 double sqrtDIM;

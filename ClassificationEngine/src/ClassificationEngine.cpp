@@ -20,6 +20,9 @@
 #include "NOVAConfiguration.h"
 #include <iostream>
 #include <time.h>
+#include "openssl/bio.h"
+#include "openssl/ssl.h"
+#include "openssl/err.h"
 
 using namespace std;
 using namespace Nova;
@@ -435,29 +438,22 @@ void *Nova::ClassificationEngine::TrainingLoop(void *ptr)
 void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 {
 	int sockfd;
-	u_char buf[MAX_MSG_SIZE];
-	struct sockaddr_in sendaddr;
 
-	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) == -1)
+	SSL_load_error_strings();
+	ERR_load_BIO_strings();
+	OpenSSL_add_all_algorithms();
+
+	stringstream socketString;
+	socketString << sAlarmPort;
+
+	BIO *bio;
+	bio = BIO_new_accept((char*)socketString.str().c_str());
+
+	//First call to BIO_accept() sets up accept BIO
+	if(BIO_do_accept(bio) <= 0)
 	{
-		syslog(SYSL_ERR, "Line: %d socket: %s", __LINE__, strerror(errno));
-		close(sockfd);
-		exit(1);
-	}
-
-	sendaddr.sin_family = AF_INET;
-	sendaddr.sin_port = htons(sAlarmPort);
-	sendaddr.sin_addr.s_addr = INADDR_ANY;
-
-	memset(sendaddr.sin_zero,'\0', sizeof sendaddr.sin_zero);
-	struct sockaddr* sockaddrPtr = (struct sockaddr*) &sendaddr;
-	socklen_t sendaddrSize = sizeof sendaddr;
-
-	if(bind(sockfd,sockaddrPtr,sendaddrSize) == -1)
-	{
-		syslog(SYSL_ERR, "Line: %d bind: %s", __LINE__, strerror(errno));
-		close(sockfd);
-		exit(1);
+		syslog(SYSL_ERR, "Line: %d recv: %s", __LINE__, strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	stringstream ss;
@@ -467,55 +463,49 @@ void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 	ss << "sudo iptables -A INPUT -p tcp --dport " << sAlarmPort << " -j REJECT --reject-with tcp-reset";
 	system(ss.str().c_str());
 
-    if(listen(sockfd, SOCKET_QUEUE_SIZE) == -1)
-    {
-		syslog(SYSL_ERR, "Line: %d listen: %s", __LINE__, strerror(errno));
-		close(sockfd);
-        exit(1);
-    }
-
-	int connectionSocket, bytesRead;
+	int bytesRead = SOCK_READ_SIZE;
 
 	//Accept incoming Silent Alarm TCP Connections
-	while(1)
+	while(true)
 	{
-
-		bzero(buf, MAX_MSG_SIZE);
-
-		//Blocking call
-		if((connectionSocket = accept(sockfd, sockaddrPtr, &sendaddrSize)) == -1)
+		//Wait for incoming connection
+		if(BIO_do_accept(bio) <= 0)
 		{
-			syslog(SYSL_ERR, "Line: %d accept: %s", __LINE__, strerror(errno));
-			close(connectionSocket);
+			syslog(LOG_WARNING, "Line: %d recv: %s", __LINE__, strerror(errno));
 			continue;
 		}
 
-		if((bytesRead = recv(connectionSocket, buf, MAX_MSG_SIZE, MSG_WAITALL)) == -1)
-		{
-			syslog(SYSL_ERR, "Line: %d recv: %s", __LINE__, strerror(errno));
-			close(connectionSocket);
-			continue;
-		}
+		//Two read buffers: one fixed size temporary buffer which is used in looping
+		//	One cumulative dynamic size buffer which holds the whole thing
+		char tempReadBuffer[SOCK_READ_SIZE];
+		vector<char> readBuffer;
 
-		//If this is from ourselves, then drop it.
-		if(hostAddr.sin_addr.s_addr == sendaddr.sin_addr.s_addr)
+		//Looping read
+		while(bytesRead < SOCK_READ_SIZE)
 		{
-			close(connectionSocket);
-			continue;
+			bytesRead = BIO_read(bio, tempReadBuffer, SOCK_READ_SIZE);
+			if( bytesRead >= 0 )
+			{
+				readBuffer.insert(readBuffer.end(), tempReadBuffer, tempReadBuffer + bytesRead);
+			}
+			else
+			{
+				syslog(SYSL_ERR, "Line: %d recv: %s", __LINE__, strerror(errno));
+				continue;
+			}
 		}
-		CryptBuffer(buf, bytesRead, DECRYPT);
 
 		pthread_rwlock_wrlock(&lock);
 		try
 		{
-			uint addr = GetSerializedAddr(buf);
+			uint addr = GetSerializedAddr((u_char *)readBuffer.data());
 			SuspectHashTable::iterator it = suspects.find(addr);
 
 			//If this is a new suspect put it in the table
 			if(it == suspects.end())
 			{
 				suspects[addr] = new Suspect();
-				suspects[addr]->DeserializeSuspectWithData(buf, BROADCAST_DATA);
+				suspects[addr]->DeserializeSuspectWithData((u_char *)readBuffer.data(), BROADCAST_DATA);
 				//We set isHostile to false so that when we classify the first time
 				// the suspect will go from benign to hostile and be sent to the doppelganger module
 				suspects[addr]->isHostile = false;
@@ -525,7 +515,7 @@ void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 			{
 				//This function will overwrite everything except the information used to calculate the classification
 				// a combined classification will be given next classification loop
-				suspects[addr]->DeserializeSuspectWithData(buf, BROADCAST_DATA);
+				suspects[addr]->DeserializeSuspectWithData((u_char *)readBuffer.data(), BROADCAST_DATA);
 			}
 			suspects[addr]->flaggedByAlarm = true;
 			//We need to move host traffic data from broadcast into the bin for this host, and remove the old bin
@@ -539,7 +529,6 @@ void *Nova::ClassificationEngine::SilentAlarmLoop(void *ptr)
 			delete suspect;
 			suspect = NULL;
 		}
-		close(connectionSocket);
 		pthread_rwlock_unlock(&lock);
 	}
 	close(sockfd);
@@ -972,7 +961,7 @@ void Nova::ClassificationEngine::SilentAlarm(Suspect *suspect)
 				uint i;
 				for(i = 0; i < SA_Max_Attempts; i++)
 				{
-					if(KnockPort(OPEN))
+					if(KnockPort(true))
 					{
 						//Send Silent Alarm to other Nova Instances with feature Data
 						if ((sockfd = socket(AF_INET,SOCK_STREAM,6)) == -1)
@@ -1020,7 +1009,7 @@ void Nova::ClassificationEngine::SilentAlarm(Suspect *suspect)
 					continue;
 				}
 				close(sockfd);
-				KnockPort(CLOSE);
+				KnockPort(false);
 				ss.str("");
 				ss << "sudo iptables -D INPUT -s " << string(inet_ntoa(serv_addr.sin_addr)) << " -p tcp -j ACCEPT";
 				commandLine = ss.str();
