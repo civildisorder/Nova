@@ -49,7 +49,7 @@ bool StartNovad()
 	}
 	else
 	{
-		return true;
+		return ConnectToNovad();
 	}
 }
 

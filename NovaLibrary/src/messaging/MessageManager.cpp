@@ -42,7 +42,7 @@ void MessageManager::Initialize(enum ProtocolDirection direction)
 
 MessageManager &MessageManager::Instance()
 {
-	if (m_instance == NULL)
+	if(m_instance == NULL)
 	{
 		LOG(ERROR, "Critical error in Message Manager", "Critical error in MessageManager: You must first initialize it with a direction"
 				"before calling Instance()");
@@ -52,11 +52,10 @@ MessageManager &MessageManager::Instance()
 
 UI_Message *MessageManager::GetMessage(int socketFD, enum ProtocolDirection direction)
 {
-
 	//Initialize the queue lock, if it doesn't exist
 	{
 		Lock queuesLock(&m_queuesLock);
-		if(m_queueLocks.count(socketFD) == 0)
+		if(m_queueLocks.find(socketFD) == m_queueLocks.end())
 		{
 			//If there is no lock object here yet, initialize it
 			m_queueLocks[socketFD] = new pthread_mutex_t;
@@ -67,7 +66,7 @@ UI_Message *MessageManager::GetMessage(int socketFD, enum ProtocolDirection dire
 	UI_Message *retMessage;
 	{
 		Lock lock(m_queueLocks[socketFD]);
-		if(m_queues.count(socketFD) > 0)
+		if(m_queues.find(socketFD) != m_queues.end())
 		{
 			retMessage = m_queues[socketFD]->PopMessage(direction);
 		}
@@ -92,7 +91,6 @@ UI_Message *MessageManager::GetMessage(int socketFD, enum ProtocolDirection dire
 				delete m_sockets[socketFD];
 				m_sockets.erase(socketFD);
 			}
-
 		}
 	}
 
@@ -104,7 +102,7 @@ void MessageManager::StartSocket(int socketFD)
 	//Initialize the socket lock if it doesn't yet exist
 	{
 		Lock socketLock(&m_socketsLock);
-		if(m_socketLocks.count(socketFD) == 0)
+		if(m_socketLocks.find(socketFD) == m_socketLocks.end())
 		{
 			//If there is no lock object here yet, initialize it
 			m_socketLocks[socketFD] = new pthread_mutex_t;
@@ -115,19 +113,18 @@ void MessageManager::StartSocket(int socketFD)
 	//Initialize the socket object if it doesn't already exist
 	{
 		Lock sockLock(m_socketLocks[socketFD]);
-		if(m_sockets.count(socketFD) == 0)
+		if(m_sockets.find(socketFD) == m_sockets.end())
 		{
 			m_sockets[socketFD] = new Socket();
 			m_sockets[socketFD]->m_socketFD = socketFD;
 		}
-
 	}
 
 	pthread_mutex_t *qMutex;
 	//Initialize the queue lock if it doesn't yet exist
 	{
 		Lock queueLock(&m_queuesLock);
-		if(m_queueLocks.count(socketFD) == 0)
+		if(m_queueLocks.find(socketFD) == m_queueLocks.end())
 		{
 			//If there is no lock object here yet, initialize it
 			m_queueLocks[socketFD] = new pthread_mutex_t;
@@ -140,32 +137,40 @@ void MessageManager::StartSocket(int socketFD)
 	//	NOTE: We use the above qMutex in order to avoid a nested lock situation
 	{
 		Lock qLock(qMutex);
-		if(m_queues.count(socketFD) == 0)
+		if(m_queues.find(socketFD) == m_queues.end())
 		{
 			m_queues[socketFD] = new MessageQueue(socketFD, m_forwardDirection);
 		}
 	}
 }
 
-Lock MessageManager::UseSocket(int socketFD)
+const Lock& MessageManager::UseSocket(int socketFD)
 {
-	Lock lock(&m_socketsLock);
-
-	if(m_socketLocks.count(socketFD) == 0)
+	bool needsInit = false;
 	{
-		//If there is no lock object here yet, initialize it
-		m_queueLocks[socketFD] = new pthread_mutex_t;
-		pthread_mutex_init(m_queueLocks[socketFD], NULL);
+		Lock lock(&m_socketsLock);
+		if(m_socketLocks.find(socketFD) == m_socketLocks.end())
+		{
+			needsInit = true;
+		}
 	}
-
-	return Lock(m_socketLocks[socketFD]);
+	if(needsInit)
+	{
+		StartSocket(socketFD);
+	}
+	const Lock * ret = NULL;
+	{
+		Lock lock(&m_socketsLock);
+		const Lock& temp = Lock(m_socketLocks[socketFD]);
+		ret = &temp;
+	}
+	return *ret;
 }
 
 void MessageManager::CloseSocket(int socketFD)
 {
 	Lock lock(&m_queuesLock);
-
-	if(m_queues.count(socketFD) > 0)
+	if(m_queues.find(socketFD) != m_queues.end())
 	{
 		shutdown(socketFD, SHUT_RDWR);
 	}
@@ -174,21 +179,17 @@ void MessageManager::CloseSocket(int socketFD)
 void MessageManager::RegisterCallback(int socketFD)
 {
 	bool foundIt = false;
-
 	{
 		Lock lock(&m_queuesLock);
-
-		if(m_queues.count(socketFD) > 0)
+		if(m_queues.find(socketFD) != m_queues.end())
 		{
 			foundIt = true;
 		}
 	}
-
 	if(foundIt)
 	{
 		m_queues[socketFD]->RegisterCallback();
 	}
-
 }
 
 }

@@ -228,7 +228,7 @@ void NovaGUI::contextMenuEvent(QContextMenuEvent * event)
 		{
 			case COMPONENT_NOVAD:
 			{
-				if(IsNovadUp(false))
+				if(IsNovadUp())
 				{
 					m_systemStatMenu->addAction(ui.actionSystemStatReload);
 					m_systemStatMenu->addAction(ui.actionSystemStatStop);
@@ -386,7 +386,7 @@ void NovaGUI::UpdateSystemStatus()
 
 	//Novad
 	item = ui.systemStatusTable->item(COMPONENT_NOVAD, 0);
-	if(IsNovadUp(false))
+	if(IsNovadUp())
 	{
 		item->setIcon(*m_greenIcon);
 
@@ -811,7 +811,7 @@ void NovaGUI::ClearSuspectList()
 
 void NovaGUI::on_actionRunNova_triggered()
 {
-	if(IsNovadUp(false))
+	if(IsNovadUp())
 	{
 		return;
 	}
@@ -1076,7 +1076,7 @@ void NovaGUI::on_haystackButton_clicked()
 
 void NovaGUI::on_runButton_clicked()
 {
-	if(IsNovadUp(false))
+	if(IsNovadUp())
 	{
 		return;
 	}
@@ -1097,7 +1097,7 @@ void NovaGUI::on_systemStatusTable_itemSelectionChanged()
 	{
 		case COMPONENT_NOVAD:
 		{
-			if(IsNovadUp(false))
+			if(IsNovadUp())
 			{
 				ui.systemStatStartButton->setDisabled(true);
 				ui.systemStatStopButton->setDisabled(false);
@@ -1163,7 +1163,7 @@ void NovaGUI::on_actionSystemStatStart_triggered()
 	{
 		case COMPONENT_NOVAD:
 		{
-			if(IsNovadUp(false))
+			if(IsNovadUp())
 			{
 				return;
 			}

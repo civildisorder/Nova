@@ -16,12 +16,12 @@
 // Description : Handles requests for information from Novad
 //============================================================================
 
-#include "Commands.h"
 #include "messaging/MessageManager.h"
 #include "messaging/messages/ControlMessage.h"
 #include "messaging/messages/RequestMessage.h"
 #include "messaging/messages/ErrorMessage.h"
 #include "messaging/Socket.h"
+#include "Commands.h"
 #include "Logger.h"
 #include "Lock.h"
 
@@ -31,19 +31,20 @@ using namespace Nova;
 using namespace std;
 
 extern int IPCSocketFD;
+extern bool isFirstConnect;
 
 namespace Nova
 {
-bool IsNovadUp(bool tryToConnect)
+bool IsNovadUp()
 {
-
-	if(tryToConnect)
+	if(isFirstConnect)
 	{
 		//If we couldn't connect, then it's definitely not up
-		if(!ConnectToNovad())
-		{
-			return false;
-		}
+		return ConnectToNovad();
+	}
+	else if(IPCSocketFD == -1)
+	{
+		return false;
 	}
 
 	Lock lock = MessageManager::Instance().UseSocket(IPCSocketFD);

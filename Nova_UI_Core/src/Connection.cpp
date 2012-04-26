@@ -43,33 +43,34 @@ namespace Nova
 {
 bool ConnectToNovad()
 {
-	Lock lock = MessageManager::Instance().UseSocket(IPCSocketFD);
-
 	if(isFirstConnect)
 	{
 		MessageManager::Initialize(DIRECTION_TO_NOVAD);
 		isFirstConnect = false;
 	}
+	//Create the socket if it hasn't been yet
+	if(IPCSocketFD == -1)
+	{
+		//Builds the key path
+		string key = Config::Inst()->GetPathHome();
+		key += "/keys";
+		key += NOVAD_LISTEN_FILENAME;
 
-	if(IsNovadUp(false))
+		//Builds the address
+		novadAddress.sun_family = AF_UNIX;
+		strcpy(novadAddress.sun_path, key.c_str());
+
+		if((IPCSocketFD = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+		{
+			LOG(ERROR, " socket: "+string(strerror(errno))+".", "");
+			return false;
+		}
+	}
+	else if(IsNovadUp())
 	{
 		return true;
 	}
-
-	//Builds the key path
-	string key = Config::Inst()->GetPathHome();
-	key += "/keys";
-	key += NOVAD_LISTEN_FILENAME;
-
-	//Builds the address
-	novadAddress.sun_family = AF_UNIX;
-	strcpy(novadAddress.sun_path, key.c_str());
-
-	if((IPCSocketFD = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-	{
-		LOG(ERROR, " socket: "+string(strerror(errno))+".", "");
-		return false;
-	}
+	Lock lock = MessageManager::Instance().UseSocket(IPCSocketFD);
 
 	if(connect(IPCSocketFD, (struct sockaddr *)&novadAddress, sizeof(novadAddress)) == -1)
 	{
@@ -78,8 +79,6 @@ bool ConnectToNovad()
 		IPCSocketFD = -1;
 		return false;
 	}
-
-	MessageManager::Instance().StartSocket(IPCSocketFD);
 
 	ControlMessage connectRequest(CONTROL_CONNECT_REQUEST, DIRECTION_TO_NOVAD);
 	if(!UI_Message::WriteMessage(&connectRequest, IPCSocketFD))
@@ -90,7 +89,7 @@ bool ConnectToNovad()
 		return false;
 	}
 
-	UI_Message *reply = UI_Message::ReadMessage(IPCSocketFD, DIRECTION_TO_NOVAD, REPLY_TIMEOUT);
+	UI_Message *reply = UI_Message::ReadMessage(IPCSocketFD, DIRECTION_TO_UI, REPLY_TIMEOUT);
 	if (reply->m_messageType == ERROR_MESSAGE && ((ErrorMessage*)reply)->m_errorType == ERROR_TIMEOUT)
 	{
 		LOG(ERROR, "Timeout error when waiting for message reply", "");

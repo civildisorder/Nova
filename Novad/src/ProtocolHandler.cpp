@@ -43,12 +43,13 @@ using namespace Nova;
 using namespace std;
 
 Socket IPCParentSocket;
-int tempIPCSocketFD;
+int tempIPCSocketFD = -1;
 
 extern SuspectTable suspects;
 extern SuspectTable suspectsSinceLastSave;
 extern pthread_mutex_t suspectsSinceLastSaveLock;
 extern time_t startTime;
+bool isFirstConnect = true;
 
 struct sockaddr_un msgRemote, msgLocal;
 int UIsocketSize;
@@ -61,19 +62,23 @@ bool Spawn_UI_Handler()
 	Lock lock(IPCParentSocket.m_mutex);
 
 	int len;
-	string inKeyPath = Config::Inst()->GetPathHome() + "/keys" + NOVAD_LISTEN_FILENAME;
-	string outKeyPath = Config::Inst()->GetPathHome() + "/keys" + UI_LISTEN_FILENAME;
+	//Builds the key path
+	string inKeyPath = Config::Inst()->GetPathHome();
+	inKeyPath += "/keys";
+	string outKeyPath = inKeyPath;
+	inKeyPath += NOVAD_LISTEN_FILENAME;
+	outKeyPath += UI_LISTEN_FILENAME;
+
+    msgLocal.sun_family = AF_UNIX;
+    strncpy(msgLocal.sun_path, inKeyPath.c_str(), inKeyPath.length());
+    unlink(msgLocal.sun_path);
+    len = strlen(msgLocal.sun_path) + sizeof(msgLocal.sun_family);
 
     if((IPCParentSocket.m_socketFD = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
     {
 		LOG(ERROR, "Failed to connect to UI", "socket: "+string(strerror(errno)));
     	return false;
     }
-
-    msgLocal.sun_family = AF_UNIX;
-    strncpy(msgLocal.sun_path, inKeyPath.c_str(), inKeyPath.length());
-    unlink(msgLocal.sun_path);
-    len = strlen(msgLocal.sun_path) + sizeof(msgLocal.sun_family);
 
     if(::bind(IPCParentSocket.m_socketFD, (struct sockaddr *)&msgLocal, len) == -1)
     {
@@ -135,7 +140,7 @@ void *Handle_UI_Thread(void *socketVoidPtr)
 	while(keepLooping)
 	{
 		//Wait for a callback to occur
-		MessageManager::Instance().RegisterCallback(controlSocket);
+		//MessageManager::Instance().RegisterCallback(controlSocket);
 
 		//TODO: Is this actually necessary? Might not be
 		//Claim the socket's mutex, so another protocol doesn't get mixed up in between
@@ -430,6 +435,10 @@ void HandleRequestMessage(RequestMessage &msg, int socketFD)
 
 bool SendSuspectToUI(Suspect *suspect)
 {
+	if(tempIPCSocketFD == -1)
+	{
+		return false;
+	}
 	Lock lock = MessageManager::Instance().UseSocket(tempIPCSocketFD);
 
 	CallbackMessage suspectUpdate(CALLBACK_SUSPECT_UDPATE, DIRECTION_TO_UI);

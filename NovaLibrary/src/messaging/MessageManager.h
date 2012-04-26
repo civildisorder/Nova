@@ -48,7 +48,7 @@ public:
 	//	socketFD - The socket file descriptor to use
 	//NOTE: On success, this is a blocking call.
 	//TODO: Error case?
-	Lock UseSocket(int socketFD);
+	const Lock& UseSocket(int socketFD);
 
 	//Closes the socket at the given file descriptor
 	//	socketFD: The file descriptor of the socket to close

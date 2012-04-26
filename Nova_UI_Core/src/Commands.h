@@ -57,10 +57,9 @@ bool StartNovad();
 bool StopNovad();
 
 //Queries Novad to see if it is currently up or down
-//	tryToConnect - Optional boolean to indicate whether this function should also try to connect to Novad before testing IsUp()
-//		You should generally just leave this alone as true.
 //	returns - True if Novad is up, false if down
-bool IsNovadUp(bool tryToConnect = true);
+// Note* if this is the first call it will Initialize and attempt to connect
+bool IsNovadUp();
 
 
 //************************************************************************

@@ -44,7 +44,6 @@ MessageQueue::MessageQueue(int socket, enum ProtocolDirection direction)
 	m_forwardDirection = direction;
 	m_socketFD = socket;
 
-	pthread_create(&m_producerThread, NULL, StaticThreadHelper, this);
 }
 
 MessageQueue::~MessageQueue()
