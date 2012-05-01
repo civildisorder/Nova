@@ -79,6 +79,7 @@ public:
 
 	std::vector<std::string> GetProfileNames();
 	Nova::profile * GetProfile(std::string name);
+	Nova::port * GetPort(std::string name);
 
 	std::vector<std::string> GetNodeNames();
 	std::vector<std::string> GetSubnetNames();
@@ -106,8 +107,9 @@ public:
 	void RegenerateMACAddresses(std::string profileName);
 	std::string GenerateUniqueMACAddress(std::string vendor);
 
-    //If a profile is edited, this function updates the changes for the rest of the GUI
     void DeleteProfile(profile *p);
+    bool DeleteProfile(std::string profileName);
+
     void RenameProfile(profile *p, std::string newName);
 
     //Deletes a single node, called from deleteNodes();

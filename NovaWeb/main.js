@@ -1,12 +1,13 @@
-var novaNode = require('nova.node');
 var novaconfig = require('novaconfig.node');
 
 
 
 
-var nova = new novaNode.Instance();
+var nova = new novaconfig.Instance();
 var config = new novaconfig.NovaConfigBinding();
 var honeydConfig = new novaconfig.HoneydConfigBinding();
+var vendorToMacDb = new novaconfig.VendorMacDbBinding();
+var osPersonalityDb = new novaconfig.OsPersonalityDbBinding();
 
 honeydConfig.LoadAllTemplates();
 
@@ -141,17 +142,17 @@ app.get('/editHoneydNode', function(req, res) {
 });
 
 app.get('/editHoneydProfile', function(req, res) {
-	profileName = req.query["profile"];
-	// TODO: Error checking for bad node names
-	
-	profile = honeydConfig.GetProfile(profileName); 
+	profileName = req.query["profile"]; 
+
 	res.render('editHoneydProfile.jade', 
 	{ locals : {
 		oldName: profileName
+		, vendors: vendorToMacDb.GetVendorNames()
+		, personalities: osPersonalityDb.GetPersonalityOptions()
 	}})
 });
 
-app.post('/configureHoneydSave', function(req, res) {
+app.post('/editHoneydNodesSave', function(req, res) {
 	var ipAddress;
 	if (req.body["ipType"] == "DHCP") {
 		ipAddress = "DHCP";
@@ -168,7 +169,7 @@ app.post('/configureHoneydSave', function(req, res) {
 	honeydConfig.AddNewNodes(profile, ipAddress, intface, subnet, count);
 	honeydConfig.SaveAllTemplates();
      
-	res.render('saveRedirect.jade', { locals: {redirectLink: "'/configureHoneyd'"}})
+	res.render('saveRedirect.jade', { locals: {redirectLink: "'/configHoneydNodes'"}})
 
 });
 
@@ -196,7 +197,7 @@ app.post('/editHoneydNodeSave', function(req, res) {
 	honeydConfig.AddNewNode(profile, ipAddress, macAddress, intface, subnet);
 	honeydConfig.SaveAllTemplates();
      
-	res.render('saveRedirect.jade', { locals: {redirectLink: "'/configureHoneyd'"}})
+	res.render('saveRedirect.jade', { locals: {redirectLink: "'/configHoneydNodes'"}})
 
 });
 
@@ -271,10 +272,52 @@ everyone.now.deleteNode = function(nodeName)
 	honeydConfig.SaveAllTemplates();
 }
 
+everyone.now.deleteProfile = function(profileName)
+{
+	var returnValue = true;
+	
+	if (!honeydConfig.DeleteProfile(profileName)) {
+		returnValue = false;
+	}
+	
+	
+	if (!honeydConfig.SaveAllTemplates()) {
+		returnValue = false;
+	}
+	
+	if (returnValue) {
+		console.log("Deleted honeyd profile " + profileName);
+	} else {
+		console.log("Failed deleted honeyd profile " + profileName);
+	}
+
+	return returnValue;
+}
+
 everyone.now.GetProfile = function(profileName, callback) {
 	var profile = honeydConfig.GetProfile(profileName);
-	console.log("Got eth " + profile.GetEthernet() + " for profile " + profileName);
-	callback(profile);
+	
+    // Nowjs can't pass the object with methods, they need to be member vars
+    profile.name = profile.GetName();
+    profile.tcpAction = profile.GetTcpAction();
+    profile.udpAction = profile.GetUdpAction();
+    profile.icmpAction = profile.GetIcmpAction();
+    profile.personality = profile.GetPersonality();
+    profile.ethernet = profile.GetEthernet();
+    profile.uptimeMin = profile.GetUptimeMin();
+    profile.uptimeMax = profile.GetUptimeMax();
+    profile.dropRate = profile.GetDropRate();
+
+    profile.isTcpActionInherited = profile.isTcpActionInherited();
+    profile.isUdpActionInherited = profile.isUdpActionInherited();
+    profile.isIcmpActionInherited = profile.isIcmpActionInherited();
+    profile.isPersonalityInherited = profile.isPersonalityInherited();
+    profile.isEthernetInherited = profile.isEthernetInherited();
+    profile.isUptimeInherited = profile.isUptimeInherited();
+    profile.isDropRateInherited = profile.isDropRateInherited();
+
+
+    callback(profile);
 }
 
  everyone.now.test = function(val, callback){
