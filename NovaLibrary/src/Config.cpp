@@ -17,7 +17,10 @@
 //============================================================================/*
 
 #include <sys/stat.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <sys/un.h>
+#include <syslog.h>
 #include <fstream>
 #include <sstream>
 #include <math.h>
@@ -90,15 +93,41 @@ Config* Config::Inst()
 	if(m_instance == NULL)
 	{
 		m_instance = new Config();
+		m_instance->LoadInterfaces();
 	}
 	return m_instance;
+}
+
+Config::Config()
+{
+	pthread_rwlock_init(&m_lock, NULL);
+	pthread_rwlock_wrlock(&m_lock);
+
+	LoadPaths();
+
+	if(!InitUserConfigs(m_pathHome))
+	{
+		// Do not call LOG here, Config and logger are not yet initialized
+		cout << "CRITICAL ERROR: InitUserConfigs failed" << endl;
+	}
+
+	m_configFilePath = m_pathHome + string("/Config/NOVAConfig.txt");
+	m_userConfigFilePath = m_pathHome + string("/settings");
+	SetDefaults();
+	LoadUserConfig();
+	pthread_rwlock_unlock(&m_lock);
+	LoadConfig();
+}
+
+Config::~Config()
+{
+
 }
 
 // Loads the configuration file into the class's state data
 void Config::LoadConfig()
 {
 	pthread_rwlock_wrlock(&m_lock);
-
 	string line;
 	string prefix;
 	int prefixIndex;
@@ -119,53 +148,44 @@ void Config::LoadConfig()
 			if(!line.substr(0, prefix.size()).compare(prefix))
 			{
 				line = line.substr(prefix.size() + 1, line.size());
-				if(line.size() > 0)
+				while(line.size() > 0)
 				{
-					// Try and detect a default interface by checking what the default route in the IP kernel's IP table is
-					if(strcmp(line.c_str(), "default") == 0)
+					//Parse out an interface
+					string interface = line.substr(0, line.find_first_of(" "));
+
+					//separate any remaining entries
+					if(line.size() > interface.size())
 					{
-
-						FILE * out = popen("netstat -rn", "r");
-						if(out != NULL)
-						{
-							char buffer[2048];
-							char * column;
-							int currentColumn;
-							char * line = fgets(buffer, sizeof(buffer), out);
-
-							while (line != NULL)
-							{
-								currentColumn = 0;
-								column = strtok(line, " \t\n");
-
-								// Wait until we have the default route entry, ignore other entries
-								if(strcmp(column, "0.0.0.0") == 0)
-								{
-									while (column != NULL)
-									{
-										// Get the column that has the interface name
-										if(currentColumn == 7)
-										{
-
-											m_interface = column;
-											isValid[prefixIndex] = true;
-										}
-
-										column = strtok(NULL, " \t\n");
-										currentColumn++;
-									}
-								}
-
-								line = fgets(buffer, sizeof(buffer), out);
-							}
-						}
-						pclose(out);
+						line = line.substr(interface.size()+1, line.size());
 					}
+					//else assert empty line to break the loop
 					else
 					{
-						m_interface = line;
+						line = "";
 					}
-					isValid[prefixIndex] = true;
+
+					//trim extra whitespaces
+					Nova::Trim(interface);
+
+					//Check for illegal characters
+					if((interface.find("\\") == interface.npos) && (interface.find("/") == interface.npos))
+					{
+						switch(interface.at(0))
+						{
+							default:
+							{
+								m_interfaces.push_back(interface);
+								isValid[prefixIndex] = true;
+								break;
+							}
+							case '.':
+							case '-':
+							case '`':
+							{
+								break;
+							}
+						}
+					}
 				}
 				continue;
 			}
@@ -424,7 +444,7 @@ void Config::LoadConfig()
 				line = line.substr(prefix.size() + 1, line.size());
 				if(line.size() > 0)
 				{
-					m_doppelInterface = line;
+					m_loopbackIF = line;
 					isValid[prefixIndex] = true;
 				}
 				continue;
@@ -665,8 +685,12 @@ void Config::LoadConfig()
 	{
 		if(!isValid[i])
 		{
-			// Do not call LOG here, Config and Logger are not yet initialized
-			cout << "Invalid configuration option" << m_prefixes[i] << " is invalid in the configuration file." << endl;
+			stringstream ss;
+			ss << "ERROR File: " << __FILE__ << "at line: " << __LINE__ << "Configuration option '"
+				<< m_prefixes[i] << "' is invalid.";
+			::openlog("Nova", OPEN_SYSL, LOG_AUTHPRIV);
+			syslog(ERROR, "%s %s", "ERROR", ss.str().c_str());
+			closelog();
 		}
 	}
 	pthread_rwlock_unlock(&m_lock);
@@ -674,8 +698,6 @@ void Config::LoadConfig()
 
 bool Config::LoadUserConfig()
 {
-	pthread_rwlock_wrlock(&m_lock);
-
 	string prefix, line;
 	uint i = 0;
 	bool returnValue = true;
@@ -743,15 +765,11 @@ bool Config::LoadUserConfig()
 		returnValue = false;
 	}
 	settings.close();
-
-	pthread_rwlock_unlock(&m_lock);
 	return returnValue;
 }
 
 bool Config::LoadPaths()
 {
-	pthread_rwlock_wrlock(&m_lock);
-
 	//Get locations of nova files
 	ifstream *paths =  new ifstream(PATHS_FILE);
 	string prefix, line;
@@ -805,9 +823,117 @@ bool Config::LoadPaths()
 	}
 	paths->close();
 	delete paths;
-	pthread_rwlock_unlock(&m_lock);
-
 	return true;
+}
+
+void Config::LoadInterfaces()
+{
+	pthread_rwlock_wrlock(&m_lock);
+	struct ifaddrs * devices = NULL;
+	ifaddrs *curIf = NULL;
+	stringstream ss;
+
+	//Get a list of interfaces
+	if(getifaddrs(&devices))
+	{
+		LOG(ERROR, string("Ethernet Interface Auto-Detection failed: ") + string(strerror(errno)), "");
+	}
+
+	// ********** LOOPBACK ADAPTER************* //
+
+	//Choose the first loopback adapter in the default case
+	if(!m_loopbackIF.compare("default"))
+	{
+		m_loIsDefault = true;
+		for(curIf = devices; curIf != NULL; curIf = curIf->ifa_next)
+		{
+			//If we find a valid loopback interface exit the loop early (curIf != NULL)
+			if((curIf->ifa_flags & IFF_LOOPBACK) && ((int)curIf->ifa_addr->sa_family == AF_INET))
+			{
+				m_loopbackIF = string(curIf->ifa_name);
+				break;
+			}
+		}
+	}
+	else
+	{
+		m_loIsDefault = false;
+		for(curIf = devices; curIf != NULL; curIf = curIf->ifa_next)
+		{
+			//If we match the interface exit the loop early (curIf != NULL)
+			if((curIf->ifa_flags & IFF_LOOPBACK) && (!m_loopbackIF.compare(string(curIf->ifa_name)))
+				&& ((int)curIf->ifa_addr->sa_family == AF_INET))
+			{
+				break;
+			}
+		}
+	}
+
+	//If we couldn't match a loopback interface notify the user
+	if(curIf == NULL)
+	{
+		ss.str("");
+		ss << "ERROR File: " << __FILE__ << "at line: " << __LINE__
+			<< "Configuration option 'DOPPELGANGER_INTERFACE' is invalid.";
+		::openlog("Nova", OPEN_SYSL, LOG_AUTHPRIV);
+		syslog(ERROR, "%s %s", "ERROR", ss.str().c_str());
+		closelog();
+	}
+	// -------------------------------------------- //
+
+	// ********** ETHERNET INTERFACES ************* //
+	vector<string> interfaces = m_interfaces;
+
+	//Use all valid devices
+	if(!m_interfaces[0].compare("default"))
+	{
+		m_ifIsDefault = true;
+		m_interfaces.clear();
+		for(curIf = devices; curIf != NULL; curIf = curIf->ifa_next)
+		{
+			if(!(curIf->ifa_flags & IFF_LOOPBACK) && ((int)curIf->ifa_addr->sa_family == AF_INET))
+			{
+				m_interfaces.push_back(string(curIf->ifa_name));
+			}
+		}
+	}
+	else
+	{
+		m_ifIsDefault = false;
+		//Until every interface is matched
+		while(!interfaces.empty())
+		{
+			m_interfaces.clear();
+			//Pop an interface name
+			string temp = interfaces.back();
+			interfaces.pop_back();
+
+			for(curIf = devices; curIf != NULL; curIf = curIf->ifa_next)
+			{
+				//If we match the interface exit the loop early (curIf != NULL)
+				if(!(curIf->ifa_flags & IFF_LOOPBACK) && (!temp.compare(string(curIf->ifa_name)))
+					&& ((int)curIf->ifa_addr->sa_family == AF_INET))
+				{
+					m_interfaces.push_back(temp);
+					break;
+				}
+			}
+
+			//If we couldn't match every interface notify the user and exit the while loop
+			if(curIf == NULL)
+			{
+				ss.str("");
+				ss << "ERROR File: " << __FILE__ << "at line: " << __LINE__
+					<< "Configuration option 'INTERFACE' is invalid.";
+				::openlog("Nova", OPEN_SYSL, LOG_AUTHPRIV);
+				syslog(ERROR, "%s %s", "ERROR", ss.str().c_str());
+				closelog();
+				break;
+			}
+		}
+	}
+	freeifaddrs(devices);
+	pthread_rwlock_unlock(&m_lock);
 }
 
 string Config::ResolvePathVars(string path)
@@ -908,7 +1034,7 @@ bool Config::SaveConfig()
 			prefix = "INTERFACE";
 			if(!line.substr(0,prefix.size()).compare(prefix))
 			{
-				*out << prefix << " " << GetInterface() << endl;
+				*out << prefix << " " << GetInterface(0) << endl;
 				continue;
 			}
 
@@ -1085,7 +1211,7 @@ bool Config::SaveConfig()
 
 void Config::SetDefaults()
 {
-	m_interface = "default";
+	m_interfaces.push_back("default");
 	m_pathConfigHoneydHs 	= "Config/haystack.config";
 	m_pathPcapFile 		= "../pcapfile";
 	m_pathTrainingFile 	= "Data/data.txt";
@@ -1108,7 +1234,7 @@ void Config::SetDefaults()
 	m_saMaxAttempts = 3;
 	m_saSleepDuration = .5;
 	m_doppelIp = "10.0.0.1";
-	m_doppelInterface = "lo";
+	m_loopbackIF = "lo";
 	m_enabledFeatureMask = "111111111";
 	m_thinningDistance = 0;
 	m_saveFreq = 1440;
@@ -1176,64 +1302,49 @@ string Config::ToString()
 	pthread_rwlock_rdlock(&m_lock);
 
 	std::stringstream ss;
-	ss << "getConfigFilePath() " << GetConfigFilePath() << endl;
-	ss << "getDoppelInterface() " << GetDoppelInterface() << endl;
-	ss << "getDoppelIp() " << GetDoppelIp() << endl;
-	ss << "getEnabledFeatures() " << GetEnabledFeatures() << endl;
-	ss << "getInterface() " << GetInterface() << endl;
-	ss << "getPathCESaveFile() " << GetPathCESaveFile() << endl;
-	ss << "getPathConfigHoneydDm() " << GetPathConfigHoneydUser() << endl;
-	ss << "getPathConfigHoneydHs() " << GetPathConfigHoneydHS() << endl;
-	ss << "getPathPcapFile() " << GetPathPcapFile() << endl;
-	ss << "getPathTrainingCapFolder() " << GetPathTrainingCapFolder() << endl;
-	ss << "getPathTrainingFile() " << GetPathTrainingFile() << endl;
+	ss << "GetConfigFilePath() " << GetConfigFilePath() << endl;
+	ss << "GetDoppelInterface() " << GetDoppelInterface() << endl;
+	ss << "GetDoppelIp() " << GetDoppelIp() << endl;
+	ss << "GetEnabledFeatures() " << GetEnabledFeatures() << endl;
+	ss << "GetInterfaces() :";
+	vector<string> ifList = GetInterfaces();
+	for(uint i = 0; i < ifList.size(); i++)
+	{
+		if(i) //If i != 0;
+		{
+			ss << ", ";
+		}
+		ss << ifList[i];
+	}
+	ss << "GetPathCESaveFile() " << GetPathCESaveFile() << endl;
+	ss << "GetPathConfigHoneydDm() " << GetPathConfigHoneydUser() << endl;
+	ss << "GetPathConfigHoneydHs() " << GetPathConfigHoneydHS() << endl;
+	ss << "GetPathPcapFile() " << GetPathPcapFile() << endl;
+	ss << "GetPathTrainingCapFolder() " << GetPathTrainingCapFolder() << endl;
+	ss << "GetPathTrainingFile() " << GetPathTrainingFile() << endl;
 
-	ss << "getReadPcap() " << GetReadPcap() << endl;
+	ss << "GetReadPcap() " << GetReadPcap() << endl;
 	ss << "GetIsDmEnabled() " << GetIsDmEnabled() << endl;
-	ss << "getIsTraining() " << GetIsTraining() << endl;
-	ss << "getGotoLive() " << GetGotoLive() << endl;
+	ss << "GetIsTraining() " << GetIsTraining() << endl;
+	ss << "GetGotoLive() " << GetGotoLive() << endl;
 
-	ss << "getClassificationTimeout() " << GetClassificationTimeout() << endl;
-	ss << "getDataTTL() " << GetDataTTL() << endl;
-	ss << "getK() " << GetK() << endl;
-	ss << "getSaMaxAttempts() " << GetSaMaxAttempts() << endl;
-	ss << "getSaPort() " << GetSaPort() << endl;
-	ss << "getSaveFreq() " << GetSaveFreq() << endl;
-	ss << "getTcpCheckFreq() " << GetTcpCheckFreq() << endl;
-	ss << "getTcpTimout() " << GetTcpTimout() << endl;
-	ss << "getThinningDistance() " << GetThinningDistance() << endl;
+	ss << "GetClassificationTimeout() " << GetClassificationTimeout() << endl;
+	ss << "GetDataTTL() " << GetDataTTL() << endl;
+	ss << "GetK() " << GetK() << endl;
+	ss << "GetSaMaxAttempts() " << GetSaMaxAttempts() << endl;
+	ss << "GetSaPort() " << GetSaPort() << endl;
+	ss << "GetSaveFreq() " << GetSaveFreq() << endl;
+	ss << "GetTcpCheckFreq() " << GetTcpCheckFreq() << endl;
+	ss << "GetTcpTimout() " << GetTcpTimout() << endl;
+	ss << "GetThinningDistance() " << GetThinningDistance() << endl;
 
-	ss << "getClassificationThreshold() " << GetClassificationThreshold() << endl;
-	ss << "getSaSleepDuration() " << GetSaSleepDuration() << endl;
-	ss << "getEps() " << GetEps() << endl;
+	ss << "GetClassificationThreshold() " << GetClassificationThreshold() << endl;
+	ss << "GetSaSleepDuration() " << GetSaSleepDuration() << endl;
+	ss << "GetEps() " << GetEps() << endl;
 
 	pthread_rwlock_unlock(&m_lock);
 	return ss.str();
 }
-
-Config::Config()
-{
-	pthread_rwlock_init(&m_lock, NULL);
-	LoadPaths();
-
-	if(!InitUserConfigs(GetPathHome()))
-	{
-		// Do not call LOG here, Config and logger are not yet initialized
-		cout << "CRITICAL ERROR: InitUserConfigs failed" << endl;
-	}
-
-	m_configFilePath = GetPathHome() + "/Config/NOVAConfig.txt";
-	m_userConfigFilePath = GetPathHome() + "/settings";
-	SetDefaults();
-	LoadConfig();
-	LoadUserConfig();
-}
-
-Config::~Config()
-{
-
-}
-
 
 std::string Config::ReadSetting(std::string key)
 {
@@ -1373,7 +1484,7 @@ int Config::GetDataTTL()
 string Config::GetDoppelInterface()
 {
 	pthread_rwlock_rdlock(&m_lock);
-	string doppelInterface = m_doppelInterface;
+	string doppelInterface = m_loopbackIF;
 	pthread_rwlock_unlock(&m_lock);
 	return doppelInterface;
 }
@@ -1402,7 +1513,7 @@ uint Config::GetEnabledFeatureCount()
 	return enabledFeatureCount;
 }
 
-bool Config::IsFeatureEnabled(int i)
+bool Config::IsFeatureEnabled(uint i)
 {
 	pthread_rwlock_rdlock(&m_lock);
 	bool isFeatureEnabled = m_isFeatureEnabled[i];
@@ -1426,12 +1537,32 @@ bool Config::GetGotoLive()
 	return gotoLive;
 }
 
-string Config::GetInterface()
+string Config::GetInterface(uint i)
 {
 	pthread_rwlock_rdlock(&m_lock);
-	string interface = m_interface;
+	string interface = "";
+	if(m_interfaces.size() > i)
+	{
+		interface = m_interfaces[i];
+	}
 	pthread_rwlock_unlock(&m_lock);
 	return interface;
+}
+
+vector<string> Config::GetInterfaces()
+{
+	pthread_rwlock_rdlock(&m_lock);
+	vector<string> ret = m_interfaces;
+	pthread_rwlock_unlock(&m_lock);
+	return ret;
+}
+
+uint Config::GetInterfaceCount()
+{
+	pthread_rwlock_rdlock(&m_lock);
+	uint ret = m_interfaces.size();
+	pthread_rwlock_unlock(&m_lock);
+	return ret;
 }
 
 bool Config::GetIsDmEnabled()
@@ -1625,7 +1756,7 @@ void Config::SetDataTTL(int dataTTL)
 void Config::SetDoppelInterface(string doppelInterface)
 {
 	pthread_rwlock_wrlock(&m_lock);
-	m_doppelInterface = doppelInterface;
+	m_loopbackIF = doppelInterface;
 	pthread_rwlock_unlock(&m_lock);
 }
 
@@ -1678,10 +1809,32 @@ void Config::SetGotoLive(bool gotoLive)
 	pthread_rwlock_unlock(&m_lock);
 }
 
-void Config::SetInterface(string interface)
+void Config::AddInterface(string interface)
 {
 	pthread_rwlock_wrlock(&m_lock);
-	m_interface = interface;
+	for(uint i = 0; i < m_interfaces.size(); i++)
+	{
+		if(!m_interfaces[i].compare(interface))
+		{
+			pthread_rwlock_unlock(&m_lock);
+			return;
+		}
+	}
+	m_interfaces.push_back(interface);
+	pthread_rwlock_unlock(&m_lock);
+}
+
+void Config::RemoveInterface(string interface)
+{
+	pthread_rwlock_wrlock(&m_lock);
+	for(uint i = 0; i < m_interfaces.size(); i++)
+	{
+		if(!m_interfaces[i].compare(interface))
+		{
+			m_interfaces.erase(m_interfaces.begin()+i);
+			break;
+		}
+	}
 	pthread_rwlock_unlock(&m_lock);
 }
 

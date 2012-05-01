@@ -38,7 +38,7 @@ namespace Nova
 Doppelganger::Doppelganger(SuspectTable& suspects)
 : m_suspectTable(suspects)
 {
-	hostIP = GetLocalIP(Config::Inst()->GetInterface().c_str());
+	hostIP = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 	m_initialized = false;
 }
 
@@ -211,7 +211,7 @@ void Doppelganger::ResetDoppelganger()
 	ClearDoppelganger();
 	InitDoppelganger();
 
-	hostIP = GetLocalIP(Config::Inst()->GetInterface().c_str());
+	hostIP = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 	string buf, commandLine, prefix = "sudo ipables -t nat ";
 
 	commandLine = prefix + "-F DOPP";

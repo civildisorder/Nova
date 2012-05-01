@@ -16,6 +16,17 @@
 // Description : NOVA preferences/configuration window
 //============================================================================
 
+#include <boost/foreach.hpp>
+#include <QRadioButton>
+#include <netinet/in.h>
+#include <QFileDialog>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <errno.h>
+#include <fstream>
+#include <QDir>
+
 #include "Logger.h"
 #include "Config.h"
 #include "NovaUtil.h"
@@ -23,17 +34,10 @@
 #include "subnetPopup.h"
 #include "NovaComplexDialog.h"
 
-#include <boost/foreach.hpp>
-#include <netinet/in.h>
-#include <QFileDialog>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fstream>
-#include <QDir>
-
-using namespace std;
-using namespace Nova;
 using boost::property_tree::ptree;
+using namespace Nova;
+using namespace std;
+
 
 /************************************************
  * Construct and Initialize GUI
@@ -42,6 +46,10 @@ using boost::property_tree::ptree;
 NovaConfig::NovaConfig(QWidget *parent, string home)
     : QMainWindow(parent)
 {
+
+	m_radioButtons = new QButtonGroup(ui.interfaceHLayout);
+	m_radioButtons->setExclusive(true);
+	m_interfaceCheckBoxes = new QButtonGroup(ui.interfaceHLayout);
 	m_portMenu = new QMenu(this);
 	m_profileTreeMenu = new QMenu(this);
 	m_nodeTreeMenu = new QMenu(this);
@@ -123,14 +131,6 @@ void NovaConfig::PushData()
 
 	path = Config::Inst()->GetPathConfigHoneydHS();
 
-	/* Copies the tables
-	m_honeydConfig->SetScripts(m_honeydConfig->m_scripts);
-	mainwindow->m_honeydConfig->SetProfiles(m_profiles);
-	m_honeydConfig->SetSubnets(m_honeydConfig->m_subnets);
-	m_honeydConfig->SetNodes(m_nodes);
-	m_honeydConfig->SetPorts(m_honeydConfig->m_ports);
-	*/
-
 	//Saves the current configuration to XML files
 	m_honeydConfig->SaveAllTemplates();
 	m_honeydConfig->WriteHoneydConfiguration(path);
@@ -141,23 +141,6 @@ void NovaConfig::PushData()
 //used on start up or to undo all changes (currently defaults button)
 void NovaConfig::PullData()
 {
-	//Clears the tables
-	/*
-	m_honeydConfig->m_subnets.clear_no_resize();
-	m_nodes.clear_no_resize();
-	m_profiles.clear_no_resize();
-	m_honeydConfig->m_ports.clear_no_resize();
-	m_honeydConfig->m_scripts.clear_no_resize();
-	*/
-
-	/* Copies the tables
-	m_honeydConfig->m_scripts = m_honeydConfig->GetScripts();
-	m_honeydConfig->m_subnets = m_honeydConfig->GetSubnets();
-	m_nodes = m_honeydConfig->GetNodes();
-	m_honeydConfig->m_ports = m_honeydConfig->GetPorts();
-	m_profiles = m_honeydConfig->GetProfiles();
-	*/
-
 	m_honeydConfig->LoadAllTemplates();
 }
 
@@ -1153,9 +1136,83 @@ bool NovaConfig::DisplayMACPrefixWindow()
 
 void NovaConfig::LoadNovadPreferences()
 {
-	ui.interfaceEdit->setText(QString::fromStdString(Config::Inst()->GetInterface()));
-	ui.dataEdit->setText(QString::fromStdString(Config::Inst()->GetPathTrainingFile()));
+	struct ifaddrs * devices = NULL;
+	struct ifaddrs *curIf = NULL;
+	stringstream ss;
 
+	//Get a list of interfaces
+	if(getifaddrs(&devices))
+	{
+		LOG(ERROR, string("Ethernet Interface Auto-Detection failed: ") + string(strerror(errno)), "");
+	}
+
+	QList<QAbstractButton *> radioButtons = m_radioButtons->buttons();
+	while(!radioButtons.isEmpty())
+	{
+		delete radioButtons.takeFirst();
+	}
+	QList<QAbstractButton *> checkBoxes = m_interfaceCheckBoxes->buttons();
+	while(!checkBoxes.isEmpty())
+	{
+		delete checkBoxes.takeFirst();
+	}
+	delete m_radioButtons;
+	delete m_interfaceCheckBoxes;
+	m_radioButtons = new QButtonGroup(ui.loopbackGroupBox);
+	m_radioButtons->setExclusive(true);
+	m_interfaceCheckBoxes = new QButtonGroup(ui.interfaceGroupBox);
+
+	for(curIf = devices; curIf != NULL; curIf = curIf->ifa_next)
+	{
+		if((int)curIf->ifa_addr->sa_family == AF_INET)
+		{
+			//Create radio button for each loop back
+			if(curIf->ifa_flags & IFF_LOOPBACK)
+			{
+				QRadioButton * radioButton = new QRadioButton(QString(curIf->ifa_name), ui.loopbackGroupBox);
+				radioButton->setObjectName(QString(curIf->ifa_name));
+				m_radioButtons->addButton(radioButton);
+				ui.loopbackGroupBoxVLayout->addWidget(radioButton);
+				radioButtons.push_back(radioButton);
+			}
+			//Create check box for each interface
+			else
+			{
+				QCheckBox * checkBox = new QCheckBox(QString(curIf->ifa_name), ui.interfaceGroupBox);
+				checkBox->setObjectName(QString(curIf->ifa_name));
+				m_interfaceCheckBoxes->addButton(checkBox);
+				ui.interfaceGroupBoxVLayout->addWidget(checkBox);
+				checkBoxes.push_back(checkBox);
+			}
+		}
+	}
+	freeifaddrs(devices);
+	if(checkBoxes.size() == 1)
+	{
+		m_interfaceCheckBoxes->setExclusive(true);
+	}
+
+	//Select the loopback
+	{
+		QString doppIf = QString::fromStdString(Config::Inst()->GetDoppelInterface());
+		QRadioButton * checkObj = ui.loopbackGroupBox->findChild<QRadioButton *>(doppIf);
+		if(checkObj != NULL)
+		{
+			checkObj->setChecked(true);
+		}
+	}
+	vector<string> ifList = Config::Inst()->GetInterfaces();
+	while(!ifList.empty())
+	{
+		QCheckBox* checkObj = ui.interfaceGroupBox->findChild<QCheckBox *>(QString::fromStdString(ifList.back()));
+		if(checkObj != NULL)
+		{
+			checkObj->setChecked(true);
+		}
+		ifList.pop_back();
+	}
+
+	ui.dataEdit->setText(QString::fromStdString(Config::Inst()->GetPathTrainingFile()));
 	ui.saAttemptsMaxEdit->setText(QString::number(Config::Inst()->GetSaMaxAttempts()));
 	ui.saAttemptsTimeEdit->setText(QString::number(Config::Inst()->GetSaSleepDuration()));
 	ui.saPortEdit->setText(QString::number(Config::Inst()->GetSaPort()));
@@ -1414,7 +1471,7 @@ bool NovaConfig::SaveConfigurationToFile()
 	}
 	Config::Inst()->SetIsDmEnabled(ui.dmCheckBox->isChecked());
 	Config::Inst()->SetIsTraining(ui.trainingCheckBox->isChecked());
-	Config::Inst()->SetInterface(this->ui.interfaceEdit->displayText().toStdString());
+	//XXX add interfaces from list
 	Config::Inst()->SetPathTrainingFile(this->ui.dataEdit->displayText().toStdString());
 	Config::Inst()->SetSaSleepDuration(this->ui.saAttemptsTimeEdit->displayText().toDouble());
 	Config::Inst()->SetSaMaxAttempts(this->ui.saAttemptsMaxEdit->displayText().toInt());
@@ -2733,13 +2790,8 @@ void NovaConfig::SetInputValidators()
 	QDoubleValidator *udoubleValidator = new QDoubleValidator();
 	udoubleValidator->setBottom(0);
 
-	// Disallows whitespace
-	QRegExp rx("\\S+");
-	QRegExpValidator *noSpaceValidator = new QRegExpValidator(rx, this);
-
 	// Set up input validators so user can't enter obviously bad data in the QLineEdits
 	// General settings
-	ui.interfaceEdit->setValidator(noSpaceValidator);
 	ui.saAttemptsMaxEdit->setValidator(uintValidator);
 	ui.saAttemptsTimeEdit->setValidator(udoubleValidator);
 	ui.saPortEdit->setValidator(uintValidator);
@@ -3546,7 +3598,7 @@ bool NovaConfig::IsDoppelIPValid()
 	return true;
 }
 //Doppelganger IP Address Spin boxes
-void NovaConfig::on_dmIPSpinBox_0_valueChanged(int __attribute__((unused)) value)
+void NovaConfig::on_dmIPSpinBox_0_valueChanged()
 {
 	if (!IsDoppelIPValid())
 	{
@@ -3555,7 +3607,7 @@ void NovaConfig::on_dmIPSpinBox_0_valueChanged(int __attribute__((unused)) value
 	}
 }
 
-void NovaConfig::on_dmIPSpinBox_1_valueChanged(int __attribute__((unused)) value)
+void NovaConfig::on_dmIPSpinBox_1_valueChanged()
 {
 	if (!IsDoppelIPValid())
 	{
@@ -3564,7 +3616,7 @@ void NovaConfig::on_dmIPSpinBox_1_valueChanged(int __attribute__((unused)) value
 	}
 }
 
-void NovaConfig::on_dmIPSpinBox_2_valueChanged(int __attribute__((unused)) value)
+void NovaConfig::on_dmIPSpinBox_2_valueChanged()
 {
 	if (!IsDoppelIPValid())
 	{
@@ -3573,7 +3625,7 @@ void NovaConfig::on_dmIPSpinBox_2_valueChanged(int __attribute__((unused)) value
 	}
 }
 
-void NovaConfig::on_dmIPSpinBox_3_valueChanged(int __attribute__((unused)) value)
+void NovaConfig::on_dmIPSpinBox_3_valueChanged()
 {
 	if (!IsDoppelIPValid())
 	{

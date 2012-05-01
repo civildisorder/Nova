@@ -447,7 +447,7 @@ void SilentAlarm(Suspect *suspect, int oldClassification)
 {
 	int sockfd = 0;
 	string commandLine;
-	string hostAddrString = GetLocalIP(Config::Inst()->GetInterface().c_str());
+	string hostAddrString = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 
 	Suspect suspectCopy = suspects.CheckOut(suspect->GetIpAddress());
 	if(suspects.IsEmptySuspect(&suspectCopy))
@@ -669,17 +669,17 @@ bool Start_Packet_Handler()
 		LoadStateFile();
 
 		//Open in non-promiscuous mode, since we only want traffic destined for the host machine
-		handle = pcap_open_live(Config::Inst()->GetInterface().c_str(), BUFSIZ, 0, 1000, errbuf);
+		handle = pcap_open_live(Config::Inst()->GetInterface(0).c_str(), BUFSIZ, 0, 1000, errbuf);
 
 		if(handle == NULL)
 		{
 			LOG(ERROR, "Unable to start packet capture.",
-				"Unable to open network interface "+Config::Inst()->GetInterface()+" for live capture: "+string(errbuf));
+				"Unable to open network interface "+Config::Inst()->GetInterface(0)+" for live capture: "+string(errbuf));
 			exit(EXIT_FAILURE);
 		}
 
 		/* ask pcap for the network address and mask of the device */
-		ret = pcap_lookupnet(Config::Inst()->GetInterface().c_str(), &netp, &maskp, errbuf);
+		ret = pcap_lookupnet(Config::Inst()->GetInterface(0).c_str(), &netp, &maskp, errbuf);
 		if(ret == -1)
 		{
 			LOG(ERROR, "Unable to start packet capture.",
@@ -819,7 +819,7 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 
 void LoadConfiguration()
 {
-	string hostAddrString = GetLocalIP(Config::Inst()->GetInterface().c_str());
+	string hostAddrString = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 
 	if(hostAddrString.size() == 0)
 	{
@@ -904,7 +904,7 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 	//Path to the main log file
 	ifstream honeydConfFile(honeyDConfigPath.c_str());
 	vector <string> retAddresses;
-	retAddresses.push_back(GetLocalIP(Config::Inst()->GetInterface().c_str()));
+	retAddresses.push_back(GetLocalIP(Config::Inst()->GetInterface(0).c_str()));
 
 	if( honeydConfFile == NULL)
 	{
