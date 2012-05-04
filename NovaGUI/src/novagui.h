@@ -39,7 +39,7 @@ struct suspectItem
 	//We need a second item because an item can only be in one list at a time
 	QListWidgetItem * mainItem;
 };
-typedef google::dense_hash_map<uint64_t, suspectItem, std::tr1::hash<uint64_t>, eqaddr > SuspectGUIHashTable;
+typedef Nova::HashMap<uint64_t, suspectItem, std::tr1::hash<uint64_t>, eqaddr > SuspectGUIHashTable;
 
 class NovaGUI : public QMainWindow
 {
@@ -134,7 +134,7 @@ private Q_SLOTS:
 
 	//Suspect view widgets
 	void on_clearSuspectsButton_clicked();
-	void on_suspectList_itemSelectionChanged();
+	void on_suspectList_currentItemChanged(QListWidgetItem * current, QListWidgetItem * previous);
 
 	//Custom Slots
     //Updates the UI with the latest suspect information

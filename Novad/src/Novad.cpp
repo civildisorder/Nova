@@ -16,6 +16,7 @@
 // Description : Nova Daemon to perform network anti-reconnaissance
 //============================================================================
 
+#include "messaging/MessageManager.h"
 #include "ClassificationEngine.h"
 #include "ProtocolHandler.h"
 #include "SuspectTable.h"
@@ -38,6 +39,8 @@
 #include <signal.h>
 #include <iostream>
 #include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/inotify.h>
 #include <netinet/if_ether.h>
 
@@ -95,6 +98,7 @@ namespace Nova
 int RunNovaD()
 {
 	Config::Inst();
+	MessageManager::Initialize(DIRECTION_TO_UI);
 
 	if (!LockNovad())
 	{
@@ -323,9 +327,43 @@ void LoadStateFile()
 	uint numBytes = 0;
 	while (in.is_open() && !in.eof() && lengthLeft)
 	{
-		if((numBytes = suspects.ReadContents(&in, expirationTime)) == 0)
+		numBytes = suspects.ReadContents(&in, expirationTime);
+		if(numBytes == 0)
 		{
-			//No need to log, ReadContents already does so
+
+			in.close();
+
+			// Back up the possibly corrupt state file
+			int suffix = 0;
+			string stateFileBackup = Config::Inst()->GetPathCESaveFile() + ".Corrupt";
+			struct stat st;
+
+			// Find an unused filename to move it to
+			string fileName;
+			do {
+				suffix++;
+				stringstream ss;
+				ss << stateFileBackup;
+				ss << suffix;
+				fileName = ss.str();
+			} while(stat(fileName.c_str(),&st) != -1);
+
+			LOG(WARNING, "Backing up possibly corrupt state file to file " + fileName, "");
+
+			// Copy the file
+			stringstream copyCommand;
+			copyCommand << "mv " << Config::Inst()->GetPathCESaveFile() << " " << fileName;
+			if (system(copyCommand.str().c_str()) == -1) {
+				LOG(ERROR, "There was a problem when attempting to move the corrupt state file. System call failed: " + copyCommand.str(), "");
+			}
+
+			// Recreate an empty file
+			stringstream touchCommand;
+			touchCommand << "touch " << Config::Inst()->GetPathCESaveFile();
+			if (system(touchCommand.str().c_str()) == -1) {
+				LOG(ERROR, "There was a problem when attempting to recreate the state file. System call to 'touch' failed:" + touchCommand.str(), "");
+			}
+
 			break;
 		}
 		lengthLeft -= numBytes;
@@ -976,14 +1014,7 @@ void UpdateAndStore(in_addr_t key)
 		trainingFileStream << suspectCopy.GetFeatureSet(MAIN_FEATURES).m_features[j] << " ";
 	}
 	trainingFileStream << "\n";
-	if(SendSuspectToUI(&suspectCopy))
-	{
-		LOG(DEBUG, string("Sent a suspect to the UI: ")+ inet_ntoa(suspectCopy.GetInAddr()), "");
-	}
-	else
-	{
-		LOG(DEBUG, string("Failed to send a suspect to the UI: ")+ inet_ntoa(suspectCopy.GetInAddr()), "");
-	}
+	SendSuspectToUIs(&suspectCopy);
 }
 
 
@@ -1013,14 +1044,7 @@ void UpdateAndClassify(in_addr_t key)
 		}
 	}
 
-	if(SendSuspectToUI(&suspectCopy))
-	{
-		LOG(DEBUG, string("Sent a suspect to the UI: ")+ inet_ntoa(suspectCopy.GetInAddr()), "");
-	}
-	else
-	{
-		LOG(DEBUG, string("Failed to send a suspect to the UI: ")+ inet_ntoa(suspectCopy.GetInAddr()), "");
-	}
+	SendSuspectToUIs(&suspectCopy);
 
 	if(!Config::Inst()->GetIsTraining())
 	{
@@ -1031,7 +1055,6 @@ void UpdateAndClassify(in_addr_t key)
 			suspectsSinceLastSave.CheckIn(&suspectCopy);
 		}
 	}
-
 }
 
 }
