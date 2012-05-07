@@ -130,7 +130,7 @@ public:
 	bool AddProfile(profile * profile);
 
 	//Updates the profile with any modified information
-	//	Note: to modify inheritance us InheritProfile, just changing the parentProfile value and calling
+	//	Note: to modify inheritance use InheritProfile, just changing the parentProfile value and calling
 	//		this function may leave a copy of the profile as a child of the old parent next load
 	bool UpdateProfile(std::string profileName)
 	{
@@ -209,25 +209,25 @@ private:
     ScriptTable m_scripts;
 
     //load all scripts
-    void LoadScriptsTemplate();
+    bool LoadScriptsTemplate();
     //load all ports
-    void LoadPortsTemplate();
+    bool LoadPortsTemplate();
     //load all profiles
-    void LoadProfilesTemplate();
+    bool LoadProfilesTemplate();
     //load current honeyd configuration group
-    void LoadNodesTemplate();
+    bool LoadNodesTemplate();
 
     //set profile configurations
-    void LoadProfileSettings(boost::property_tree::ptree *ptr, profile *p);
+    bool LoadProfileSettings(boost::property_tree::ptree *ptr, profile *p);
     //add ports or subsystems
-    void LoadProfileServices(boost::property_tree::ptree *ptr, profile *p);
+    bool LoadProfileServices(boost::property_tree::ptree *ptr, profile *p);
     //recursive descent down profile tree
-    void LoadProfileChildren(std::string parent);
+    bool LoadProfileChildren(std::string parent);
 
     //Load stored subnets in ptr
-    void LoadSubnets(boost::property_tree::ptree *ptr);
+    bool LoadSubnets(boost::property_tree::ptree *ptr);
     //Load stored honeyd nodes ptr
-    void LoadNodes(boost::property_tree::ptree *ptr);
+    bool LoadNodes(boost::property_tree::ptree *ptr);
 
     bool DeleteProfile(std::string profileName, bool originalCall);
 

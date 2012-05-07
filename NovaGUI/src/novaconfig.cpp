@@ -1996,7 +1996,7 @@ void NovaConfig::LoadProfilesFromTree(string parent)
 					//pass 'set' subset and pointer to this profile
 					LoadProfileSettings(ptr, &p);
 				}
-				catch(...){}
+				catch(boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_tree::ptree_bad_path> > &e) {};
 
 				try //Conditional: has "add" values
 				{
@@ -2004,7 +2004,7 @@ void NovaConfig::LoadProfilesFromTree(string parent)
 					//pass 'add' subset and pointer to this profile
 					LoadProfileServices(ptr, &p);
 				}
-				catch(...){}
+				catch(boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_tree::ptree_bad_path> > &e) {};
 
 				//Save the profile
 				m_honeydConfig->m_profiles[p.name] = p;
@@ -2018,7 +2018,7 @@ void NovaConfig::LoadProfilesFromTree(string parent)
 					//pass subtree and pointer to parent
 					LoadProfileChildren(p.name);
 				}
-				catch(...){}
+				catch(boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_tree::ptree_bad_path> > &e) {};
 			}
 
 			//Honeyd's implementation of switching templates based on conditions
@@ -2233,14 +2233,14 @@ void NovaConfig::LoadProfileChildren(string parent)
 				ptr2 = &v.second.get_child("set");
 				LoadProfileSettings(ptr2, &prof);
 			}
-			catch(...){}
+			catch(boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_tree::ptree_bad_path> > &e) {};
 
 			try //Conditional: If profile has port or subsystems different from parent
 			{
 				ptr2 = &v.second.get_child("add");
 				LoadProfileServices(ptr2, &prof);
 			}
-			catch(...){}
+			catch(boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_tree::ptree_bad_path> > &e) {};
 
 			//Saves the profile
 			m_honeydConfig->m_profiles[prof.name] = prof;
@@ -2250,7 +2250,7 @@ void NovaConfig::LoadProfileChildren(string parent)
 			{
 				LoadProfileChildren(prof.name);
 			}
-			catch(...){}
+			catch(boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::property_tree::ptree_bad_path> > &e) {};
 		}
 	}
 	catch(std::exception &e)
@@ -2921,31 +2921,6 @@ void NovaConfig::DeleteNodes()
 	m_loading->unlock();
 	LoadAllNodes();
 }
-
-// Removes the node from item widgets and data structures.
-bool NovaConfig::DeleteNode(std::string node)
-{
-	//Cannot delete doppelganger node
-	if(node == "Doppelganger")
-	{
-		return false;
-	}
-
-	QTreeWidgetItem *item = GetNodeTreeWidgetItem(node);
-	if (item != NULL)
-	{
-		ui.nodeTreeWidget->removeItemWidget(item, 0);
-	}
-
-	item = GetNodeHsTreeWidgetItem(node);
-	if (item != NULL)
-	{
-		ui.hsNodeTreeWidget->removeItemWidget(item, 0);
-	}
-
-	return m_honeydConfig->DeleteNode(node);
-}
-
 
 
 /******************************************
