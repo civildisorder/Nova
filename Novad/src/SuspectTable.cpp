@@ -17,7 +17,7 @@
 // 		list of suspects.
 //============================================================================/*
 
-#include "ClassificationEngine.h"
+#include "ClassificationAggregator.h"
 #include "SuspectTable.h"
 #include "HashMap.h"
 #include "Config.h"
@@ -33,7 +33,7 @@
 using namespace std;
 using namespace Nova;
 
-extern ClassificationEngine* engine;
+extern ClassificationAggregator* engine;
 
 namespace Nova
 {

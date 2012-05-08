@@ -17,7 +17,7 @@
 //============================================================================
 
 #include "messaging/MessageManager.h"
-#include "ClassificationEngine.h"
+#include "ClassificationAggregator.h"
 #include "ProtocolHandler.h"
 #include "SuspectTable.h"
 #include "FeatureSet.h"
@@ -84,7 +84,7 @@ int notifyFd;
 int watch;
 
 
-ClassificationEngine *engine;
+ClassificationAggregator *engine;
 
 pthread_t classificationLoopThread;
 pthread_t trainingLoopThread;
@@ -153,7 +153,7 @@ int RunNovaD()
 	//Loads the configuration file
 	Config::Inst()->LoadConfig();
 
-	engine = new ClassificationEngine(suspects);
+	engine = new ClassificationAggregator();
 
 	Spawn_UI_Handler();
 
@@ -469,7 +469,8 @@ void Reload()
 	// Reload the configuration file
 	Config::Inst()->LoadConfig();
 
-	engine->LoadDataPointsFromFile(Config::Inst()->GetPathTrainingFile());
+	// TODO DTC
+	//engine->LoadDataPointsFromFile(Config::Inst()->GetPathTrainingFile());
 	Suspect suspectCopy;
 	vector<uint64_t> keys = suspects.GetAllKeys();
 	// Set everyone to be reclassified

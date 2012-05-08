@@ -4,6 +4,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
+../src/ClassificationAggregator.cpp \
 ../src/ClassificationEngine.cpp \
 ../src/Control.cpp \
 ../src/Doppelganger.cpp \
@@ -14,6 +15,7 @@ CPP_SRCS += \
 ../src/Threads.cpp 
 
 OBJS += \
+./src/ClassificationAggregator.o \
 ./src/ClassificationEngine.o \
 ./src/Control.o \
 ./src/Doppelganger.o \
@@ -24,6 +26,7 @@ OBJS += \
 ./src/Threads.o 
 
 CPP_DEPS += \
+./src/ClassificationAggregator.d \
 ./src/ClassificationEngine.d \
 ./src/Control.d \
 ./src/Doppelganger.d \

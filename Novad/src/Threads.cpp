@@ -16,7 +16,7 @@
 // Description : Novad thread loops
 //============================================================================
 
-#include "ClassificationEngine.h"
+#include "ClassificationAggregator.h"
 #include "ProtocolHandler.h"
 #include "SuspectTable.h"
 #include "FeatureSet.h"
@@ -71,7 +71,7 @@ extern int watch;
 
 
 extern pthread_rwlock_t sessionLock;
-extern ClassificationEngine *engine;
+extern ClassificationAggregator *engine;
 
 namespace Nova
 {
@@ -93,7 +93,9 @@ void *ClassificationLoop(void *ptr)
 		{
 			UpdateAndClassify(updateKeys[i]);
 		}
-		engine->m_dopp->UpdateDoppelganger();
+
+		// TODO DTC
+		//engine->m_dopp->UpdateDoppelganger();
 
 		if(Config::Inst()->GetSaveFreq() > 0)
 		{

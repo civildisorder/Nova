@@ -72,6 +72,7 @@ void FeatureSet::ClearFeatureSet()
 
 void FeatureSet::CalculateAll()
 {
+	// TODO DTC Use per engine isFeatureEnabled
 	CalculateTimeInterval();
 	if(Config::Inst()->IsFeatureEnabled(IP_TRAFFIC_DISTRIBUTION))
 	{

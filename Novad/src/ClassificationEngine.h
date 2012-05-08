@@ -42,14 +42,14 @@ enum normalizationType {
 class ClassificationEngine
 {
 public:
-	ClassificationEngine(SuspectTable &table);
+	ClassificationEngine(std::vector<featureIndex> enabledFeatures);
 
 	~ClassificationEngine();
 
 	// Performs classification on given suspect
 	//		suspect - suspect to classify based on current evidence
 	// Note: this updates the classification of the suspect in dataPtsWithClass as well as it's isHostile variable
-	void Classify(Suspect *suspect);
+	double Classify(Suspect *suspect);
 
 	// Forms the normalized kd tree, called once on start up
 	// Will be called again if the a suspect's max value for a feature exceeds the current maximum for normalization
@@ -93,6 +93,9 @@ private:
 	double m_maxFeatureValues[DIM];
 	double m_minFeatureValues[DIM];
 	double m_meanFeatureValues[DIM];
+
+	std::vector<featureIndex> m_featureIndexes;
+	double m_squrtDim;
 
 };
 

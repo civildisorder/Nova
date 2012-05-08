@@ -39,12 +39,26 @@ normalizationType ClassificationEngine::m_normalization[] = {
 		LOGARITHMIC
 };
 
-ClassificationEngine::ClassificationEngine(SuspectTable& suspects)
+ClassificationEngine::ClassificationEngine(std::vector<featureIndex> enabledFeatures)
 {
 	m_normalizedDataPts = NULL;
 	m_dataPts = NULL;
-	m_dopp = new Doppelganger(suspects);
-	m_dopp->InitDoppelganger();
+
+
+	// TODO DTC
+	// TODO Why is the doppelganger here? Needs to be somewhere else, taking SuspectTable reference out
+	//m_dopp = new Doppelganger(suspects);
+	//m_dopp->InitDoppelganger();
+
+	m_featureIndexes = enabledFeatures;
+	m_squrtDim = m_featureIndexes.size();
+
+	for (int i = 0; i < m_featureIndexes.size(); i++)
+	{
+		cout << m_featureIndexes.at(i) << endl;
+	}
+
+
 }
 
 ClassificationEngine::~ClassificationEngine()
@@ -57,7 +71,7 @@ void ClassificationEngine::FormKdTree()
 	delete m_kdTree;
 	//Normalize the data points
 	//Foreach data point
-	for(uint j = 0;j < Config::Inst()->GetEnabledFeatureCount();j++)
+	for(uint j = 0;j < m_featureIndexes.size();j++)
 	{
 		//Foreach feature within the data point
 		for(int i=0;i < m_nPts;i++)
@@ -77,13 +91,12 @@ void ClassificationEngine::FormKdTree()
 	m_kdTree = new ANNkd_tree(					// build search structure
 			m_normalizedDataPts,					// the data points
 					m_nPts,						// number of points
-					Config::Inst()->GetEnabledFeatureCount());						// dimension of space
+					m_featureIndexes.size());						// dimension of space
 }
 
 
-void ClassificationEngine::Classify(Suspect *suspect)
+double ClassificationEngine::Classify(Suspect *suspect)
 {
-	double sqrtDIM = Config::Inst()->GetSqurtEnabledFeatures();
 	int k = Config::Inst()->GetK();
 	double d;
 	featureIndex fi;
@@ -92,35 +105,33 @@ void ClassificationEngine::Classify(Suspect *suspect)
 	ANNdistArray dists = new ANNdist[k];		// allocate near neighbor dists
 
 	//Allocate the ANNpoint;
-	ANNpoint aNN = annAllocPt(Config::Inst()->GetEnabledFeatureCount());
+	ANNpoint aNN = annAllocPt(m_featureIndexes.size());
 	FeatureSet fs = suspect->GetFeatureSet(MAIN_FEATURES);
 	uint ai = 0;
 
+
 	//Iterate over the features, asserting the range is [min,max] and normalizing over that range
-	for(int i = 0;i < DIM;i++)
+	for(uint i = 0; i < m_featureIndexes.size();i++)
 	{
-		if(Config::Inst()->IsFeatureEnabled(i))
+		if(fs.m_features[m_featureIndexes.at(i)] > m_maxFeatureValues[ai])
 		{
-			if(fs.m_features[i] > m_maxFeatureValues[ai])
-			{
-				fs.m_features[i] = m_maxFeatureValues[ai];
-			}
-			else if(fs.m_features[i] < m_minFeatureValues[ai])
-			{
-				fs.m_features[i] = m_minFeatureValues[ai];
-			}
-			if(m_maxFeatureValues[ai] != 0)
-			{
-				aNN[ai] = Normalize(m_normalization[i], suspect->GetFeatureSet(MAIN_FEATURES).m_features[i],
-					m_minFeatureValues[ai], m_maxFeatureValues[ai]);
-			}
-			else
-			{
-				LOG(ERROR, "Classification engine has encountered an error.",
-					"Max value for a feature is 0. Normalization failed.");
-			}
-			ai++;
+			fs.m_features[m_featureIndexes.at(i)] = m_maxFeatureValues[ai];
 		}
+		else if(fs.m_features[m_featureIndexes.at(i)] < m_minFeatureValues[ai])
+		{
+			fs.m_features[m_featureIndexes.at(i)] = m_minFeatureValues[ai];
+		}
+		if(m_maxFeatureValues[ai] != 0)
+		{
+			aNN[ai] = Normalize(m_normalization[m_featureIndexes.at(i)], suspect->GetFeatureSet(MAIN_FEATURES).m_features[i],
+				m_minFeatureValues[ai], m_maxFeatureValues[ai]);
+		}
+		else
+		{
+			LOG(ERROR, "Classification engine has encountered an error.",
+				"Max value for a feature is 0. Normalization failed.");
+		}
+		ai++;
 	}
 	suspect->SetFeatureSet(&fs, MAIN_FEATURES);
 
@@ -128,7 +139,7 @@ void ClassificationEngine::Classify(Suspect *suspect)
 	{
 		LOG(ERROR, "Classification engine has encountered an error.",
 			"Classify had trouble allocating the ANN point. Aborting.");
-		return;
+		return -1;
 	}
 
 	m_kdTree->annkSearch(							// search
@@ -153,21 +164,18 @@ void ClassificationEngine::Classify(Suspect *suspect)
 	for(int i = 0; i < k; i++)
 	{
 		dists[i] = sqrt(dists[i]);				// unsquare distance
-		for(int j = 0; j < DIM; j++)
+		for(uint j = 0; j < m_featureIndexes.size(); j++)
 		{
-			if(Config::Inst()->IsFeatureEnabled(j))
-			{
-				double distance = (aNN[j] - m_kdTree->thePoints()[nnIdx[i]][j]);
+				double distance = (aNN[m_featureIndexes.at(j)] - m_kdTree->thePoints()[nnIdx[i]][m_featureIndexes.at(j)]);
 
 				if(distance < 0)
 				{
 					distance *= -1;
 				}
 
-				fi = (featureIndex)j;
+				fi = (featureIndex)m_featureIndexes.at(j);
 				d  = suspect->GetFeatureAccuracy(fi) + distance;
 				suspect->SetFeatureAccuracy(fi, d);
-			}
 		}
 
 		if(nnIdx[i] == -1)
@@ -181,13 +189,13 @@ void ClassificationEngine::Classify(Suspect *suspect)
 			//If Hostile
 			if(m_dataPtsWithClass[nnIdx[i]]->m_classification == 1)
 			{
-				classifyCount += (sqrtDIM - dists[i]);
+				classifyCount += (m_squrtDim - dists[i]);
 				suspect->SetHostileNeighbors(suspect->GetHostileNeighbors()+1);
 			}
 			//If benign
 			else if(m_dataPtsWithClass[nnIdx[i]]->m_classification == 0)
 			{
-				classifyCount -= (sqrtDIM - dists[i]);
+				classifyCount -= (m_squrtDim - dists[i]);
 			}
 			else
 			{
@@ -198,7 +206,7 @@ void ClassificationEngine::Classify(Suspect *suspect)
 				delete [] nnIdx;							// clean things up
 				delete [] dists;
 				annClose();
-				return;
+				return -1;
 			}
 		}
 	}
@@ -209,7 +217,7 @@ void ClassificationEngine::Classify(Suspect *suspect)
 		suspect->SetFeatureAccuracy(fi, d);
 	}
 
-	suspect->SetClassification(.5 + (classifyCount / ((2.0 * (double)k) * sqrtDIM )));
+	suspect->SetClassification(.5 + (classifyCount / ((2.0 * (double)k) * m_squrtDim )));
 
 	// Fix for rounding errors caused by double's not being precise enough if DIM is something like 2
 	if(suspect->GetClassification() < 0)
@@ -236,12 +244,14 @@ void ClassificationEngine::Classify(Suspect *suspect)
     annClose();
     annDeallocPt(aNN);
 	suspect->SetNeedsClassificationUpdate(false);
+
+	return suspect->GetClassification();
 }
 
 void ClassificationEngine::PrintPt(ostream &out, ANNpoint p)
 {
 	out << "(" << p[0];
-	for(uint i = 1;i < Config::Inst()->GetEnabledFeatureCount();i++)
+	for(uint i = 1;i < m_featureIndexes.size();i++)
 	{
 		out << ", " << p[i];
 	}
@@ -315,8 +325,8 @@ void ClassificationEngine::LoadDataPointsFromFile(string inFilePath)
 
 	//Open the file again, allocate the number of points and assign
 	myfile.open(inFilePath.data(), ifstream::in);
-	m_dataPts = annAllocPts(maxPts, Config::Inst()->GetEnabledFeatureCount()); // allocate data points
-	m_normalizedDataPts = annAllocPts(maxPts, Config::Inst()->GetEnabledFeatureCount());
+	m_dataPts = annAllocPts(maxPts, m_featureIndexes.size()); // allocate data points
+	m_normalizedDataPts = annAllocPts(maxPts, m_featureIndexes.size());
 
 
 	if(myfile.is_open())
@@ -369,33 +379,30 @@ void ClassificationEngine::LoadDataPointsFromFile(string inFilePath)
 			//if the line is valid, continue as normal
 			if(valid)
 			{
-				m_dataPtsWithClass.push_back(new Point(Config::Inst()->GetEnabledFeatureCount()));
+				m_dataPtsWithClass.push_back(new Point(m_featureIndexes.size()));
 
 				// Used for matching the 0->DIM index with the 0->Config::Inst()->getEnabledFeatureCount() index
 				int actualDimension = 0;
-				for(int defaultDimension = 0;defaultDimension < DIM;defaultDimension++)
+				for(uint defaultDimension = 0;defaultDimension < m_featureIndexes.size();defaultDimension++)
 				{
-					double temp = strtod(fieldsCheck[defaultDimension].data(), NULL);
+					double temp = strtod(fieldsCheck[m_featureIndexes.at(defaultDimension)].data(), NULL);
 
-					if(Config::Inst()->IsFeatureEnabled(defaultDimension))
+					m_dataPtsWithClass[i]->m_annPoint[actualDimension] = temp;
+					m_dataPts[i][actualDimension] = temp;
+
+					//Set the max values of each feature. (Used later in normalization)
+					if(temp > m_maxFeatureValues[actualDimension])
 					{
-						m_dataPtsWithClass[i]->m_annPoint[actualDimension] = temp;
-						m_dataPts[i][actualDimension] = temp;
-
-						//Set the max values of each feature. (Used later in normalization)
-						if(temp > m_maxFeatureValues[actualDimension])
-						{
-							m_maxFeatureValues[actualDimension] = temp;
-						}
-						if(temp < m_minFeatureValues[actualDimension])
-						{
-							m_minFeatureValues[actualDimension] = temp;
-						}
-
-						m_meanFeatureValues[actualDimension] += temp;
-
-						actualDimension++;
+						m_maxFeatureValues[actualDimension] = temp;
 					}
+					if(temp < m_minFeatureValues[actualDimension])
+					{
+						m_minFeatureValues[actualDimension] = temp;
+					}
+
+					m_meanFeatureValues[actualDimension] += temp;
+
+					actualDimension++;
 				}
 				getline(myfile,line);
 				m_dataPtsWithClass[i]->m_classification = atoi(line.data());
@@ -425,7 +432,7 @@ void ClassificationEngine::LoadDataPointsFromFile(string inFilePath)
 	//Normalize the data points
 
 	//Foreach feature within the data point
-	for(uint j = 0;j < Config::Inst()->GetEnabledFeatureCount();j++)
+	for(uint j = 0;j < m_featureIndexes.size();j++)
 	{
 		//Foreach data point
 		for(int i=0;i < m_nPts;i++)
@@ -437,7 +444,7 @@ void ClassificationEngine::LoadDataPointsFromFile(string inFilePath)
 	m_kdTree = new ANNkd_tree(					// build search structure
 			m_normalizedDataPts,					// the data points
 					m_nPts,						// number of points
-					Config::Inst()->GetEnabledFeatureCount());						// dimension of space
+					m_featureIndexes.size());						// dimension of space
 }
 
 double ClassificationEngine::Normalize(normalizationType type, double value, double min, double max)
