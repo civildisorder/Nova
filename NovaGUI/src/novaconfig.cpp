@@ -1337,6 +1337,7 @@ bool NovaConfig::SaveConfigurationToFile()
 	Config::Inst()->ClearInterfaces();
 	for(int i = 0; i < qButtonList.size(); i++)
 	{
+		//XXX configuration for selection 'any' interface aka 'default' (all ethernet interfaces selected)
 		QCheckBox * checkBoxPtr = (QCheckBox *)qButtonList.at(i);
 		if(checkBoxPtr->isChecked())
 		{
@@ -1346,6 +1347,7 @@ bool NovaConfig::SaveConfigurationToFile()
 	qButtonList = m_radioButtons->buttons();
 	for(int i = 0; i < qButtonList.size(); i++)
 	{
+		//XXX configuration for selection 'any' interface aka 'default'
 		QRadioButton * radioBtnPtr = (QRadioButton *)qButtonList.at(i);
 		if(radioBtnPtr->isChecked())
 		{

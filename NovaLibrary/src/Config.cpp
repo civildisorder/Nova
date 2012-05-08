@@ -840,7 +840,7 @@ void Config::LoadInterfaces()
 	}
 
 	// ********** LOOPBACK ADAPTER************* //
-
+	//XXX need to implement qt toggling of default
 	//Choose the first loopback adapter in the default case
 	if(!m_loopbackIF.compare("default"))
 	{
@@ -982,6 +982,8 @@ bool Config::SaveConfig()
 {
 	pthread_rwlock_rdlock(&m_lock);
 	string line, prefix;
+
+	//XXX we need to do some interface checking to determine if we are still using the default configuration
 
 	//Rewrite the config file with the new settings
 	string configurationBackup = m_configFilePath + ".tmp";
