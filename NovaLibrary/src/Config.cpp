@@ -1034,7 +1034,19 @@ bool Config::SaveConfig()
 			prefix = "INTERFACE";
 			if(!line.substr(0,prefix.size()).compare(prefix))
 			{
-				*out << prefix << " " << GetInterface(0) << endl;
+				*out << prefix;
+				if(m_ifIsDefault)
+				{
+					*out << " default" << endl;
+					continue;
+				}
+				vector<string> iFaces = m_interfaces;
+				while(!iFaces.empty())
+				{
+					*out << " " << iFaces.back();
+					iFaces.pop_back();
+				}
+				*out << endl;
 				continue;
 			}
 
@@ -1105,6 +1117,19 @@ bool Config::SaveConfig()
 			if(!line.substr(0,prefix.size()).compare(prefix))
 			{
 				*out << prefix << " " << GetDoppelIp() << endl;
+				continue;
+			}
+
+			prefix = "DOPPELGANGER_INTERFACE";
+			if(!line.substr(0,prefix.size()).compare(prefix))
+			{
+				*out << prefix;
+				if(m_loIsDefault)
+				{
+					*out << " default" << endl;
+					continue;
+				}
+				*out << " " << m_loopbackIF << endl;
 				continue;
 			}
 
@@ -1836,6 +1861,13 @@ void Config::RemoveInterface(string interface)
 		}
 	}
 	pthread_rwlock_unlock(&m_lock);
+}
+void Config::ClearInterfaces()
+{
+	pthread_rwlock_wrlock(&m_lock);
+	m_interfaces.clear();
+	pthread_rwlock_unlock(&m_lock);
+
 }
 
 void Config::SetIsDmEnabled(bool isDmEnabled)

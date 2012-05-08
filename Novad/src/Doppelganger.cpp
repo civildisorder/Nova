@@ -28,8 +28,6 @@
 
 using namespace std;
 
-string hostIP;
-
 namespace Nova
 {
 
@@ -38,7 +36,6 @@ namespace Nova
 Doppelganger::Doppelganger(SuspectTable& suspects)
 : m_suspectTable(suspects)
 {
-	hostIP = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 	m_initialized = false;
 }
 
@@ -140,11 +137,16 @@ void Doppelganger::ClearDoppelganger()
 	{
 		LOG(DEBUG, "Unable to remove Doppelganger rule, does it exist?", "Command '"+commandLine+"' was unsuccessful.");
 	}
-
-	commandLine = prefix + "-D PREROUTING -d "+ hostIP + " -j DOPP";
-	if(system(commandLine.c_str()) != 0)
+	vector<string> ifList = Config::Inst()->GetInterfaces();
+	while(!ifList.empty())
 	{
-		LOG(DEBUG, "Unable to remove Doppelganger rule, does it exist?", "Command '"+commandLine+"' was unsuccessful.");
+		string hostIP = GetLocalIP(ifList.back().c_str());
+		commandLine = prefix + "-D PREROUTING -d "+ hostIP + " -j DOPP";
+		if(system(commandLine.c_str()) != 0)
+		{
+			LOG(DEBUG, "Unable to remove Doppelganger rule, does it exist?", "Command '"+commandLine+"' was unsuccessful.");
+		}
+		ifList.pop_back();
 	}
 
 	commandLine = prefix + "-X DOPP";
@@ -196,11 +198,16 @@ void Doppelganger::InitDoppelganger()
 				" Unable to flush or create 'DOPP' rule-chain");
 		}
 	}
-
-	commandLine = "sudo iptables -t nat -I PREROUTING -d "+hostIP+" -j DOPP";
-	if(system(commandLine.c_str()) != 0)
+	vector<string> ifList = Config::Inst()->GetInterfaces();
+	while(!ifList.empty())
 	{
-		LOG(ERROR, "Error setting up system for Doppelganger", "Command '"+commandLine+"' was unsuccessful.");
+		string hostIP = GetLocalIP(ifList.back().c_str());
+		commandLine = "sudo iptables -t nat -I PREROUTING -d "+hostIP+" -j DOPP";
+		if(system(commandLine.c_str()) != 0)
+		{
+			LOG(ERROR, "Error setting up system for Doppelganger", "Command '"+commandLine+"' was unsuccessful.");
+		}
+		ifList.pop_back();
 	}
 	m_initialized = true;
 }
@@ -211,7 +218,6 @@ void Doppelganger::ResetDoppelganger()
 	ClearDoppelganger();
 	InitDoppelganger();
 
-	hostIP = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 	string buf, commandLine, prefix = "sudo ipables -t nat ";
 
 	commandLine = prefix + "-F DOPP";

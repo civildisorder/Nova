@@ -49,7 +49,7 @@ using namespace Nova;
 extern SuspectTable suspects;
 extern TCPSessionHashTable SessionTable;
 
-extern struct sockaddr_in hostAddr;
+extern vector<sockaddr_in> hostAddrs;
 
 //** Silent Alarm **
 extern struct sockaddr_in serv_addr;
@@ -64,11 +64,9 @@ extern ofstream trainingFileStream;
 extern string dhcpListFile;
 extern vector<string> haystackDhcpAddresses;
 extern pcap_t *handle;
-extern bpf_u_int32 maskp; /* subnet mask */
 
 extern int notifyFd;
 extern int watch;
-
 
 extern pthread_rwlock_t sessionLock;
 extern ClassificationEngine *engine;
@@ -247,11 +245,14 @@ void *SilentAlarmLoop(void *ptr)
 			continue;
 		}
 
-		//If this is from ourselves, then drop it.
-		if(hostAddr.sin_addr.s_addr == sendaddr.sin_addr.s_addr)
+		for(uint i = 0; i < hostAddrs.size(); i++)
 		{
-			close(connectionSocket);
-			continue;
+			//If this is from ourselves, then drop it.
+			if(hostAddrs[i].sin_addr.s_addr == sendaddr.sin_addr.s_addr)
+			{
+				close(connectionSocket);
+				continue;
+			}
 		}
 
 		CryptBuffer(buf, bytesRead, DECRYPT);
@@ -321,7 +322,7 @@ void *UpdateIPFilter(void *ptr)
 				haystackDhcpAddresses = GetHaystackDhcpAddresses(dhcpListFile);
 				string haystackAddresses_csv = ConstructFilterString();
 
-				if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0,maskp) == -1)
+				if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0,PCAP_NETMASK_UNKNOWN) == -1)
 				{
 					LOG(ERROR, "Unable to enable packet capture.",
 						"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handle));

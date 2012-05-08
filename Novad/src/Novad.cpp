@@ -59,7 +59,7 @@ pthread_rwlock_t sessionLock;
 //** Silent Alarm **
 struct sockaddr_in serv_addr;
 struct sockaddr* serv_addrPtr = (struct sockaddr *) &serv_addr;
-struct sockaddr_in hostAddr;
+vector<sockaddr_in> hostAddrs;
 
 // Timestamps for the CE state file exiration of data
 time_t lastLoadTime;
@@ -77,8 +77,6 @@ string dhcpListFile = "/var/log/honeyd/ipList";
 vector<string> haystackAddresses;
 vector<string> haystackDhcpAddresses;
 pcap_t *handle;
-bpf_u_int32 maskp; /* subnet mask */
-bpf_u_int32 netp; /* ip          */
 
 int notifyFd;
 int watch;
@@ -482,7 +480,6 @@ void SilentAlarm(Suspect *suspect, int oldClassification)
 {
 	int sockfd = 0;
 	string commandLine;
-	string hostAddrString = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
 
 	Suspect suspectCopy = suspects.CheckOut(suspect->GetIpAddress());
 	if(suspects.IsEmptySuspect(&suspectCopy))
@@ -650,7 +647,6 @@ bool Start_Packet_Handler()
 {
 	char errbuf[PCAP_ERRBUF_SIZE];
 
-	int ret;
 	string haystackAddresses_csv = "";
 
 	struct bpf_program fp;			/* The compiled filter expression */
@@ -673,8 +669,7 @@ bool Start_Packet_Handler()
 				"Couldn't open pcap file: "+Config::Inst()->GetPathPcapFile()+": "+string(errbuf)+".");
 			exit(EXIT_FAILURE);
 		}
-		if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0, maskp) == -1)
-		//if(pcap_compile(handle, &fp, "dst net 192.168.10 && !dst host 192.168.10.255" , 0, maskp) == -1)
+		if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0, PCAP_NETMASK_UNKNOWN) == -1)
 		{
 			LOG(CRITICAL, "Unable to start packet capture.",
 				"Couldn't parse filter: "+string(filter_exp)+ " " + pcap_geterr(handle) +".");
@@ -698,31 +693,22 @@ bool Start_Packet_Handler()
 		LOG(DEBUG, "Done processing PCAP file", "");
 	}
 
-
 	if(!Config::Inst()->GetReadPcap())
 	{
 		LoadStateFile();
 
 		//Open in non-promiscuous mode, since we only want traffic destined for the host machine
-		handle = pcap_open_live(Config::Inst()->GetInterface(0).c_str(), BUFSIZ, 0, 1000, errbuf);
+		handle = pcap_open_live(NULL, BUFSIZ, 0, 1000, errbuf);
 
 		if(handle == NULL)
 		{
 			LOG(ERROR, "Unable to start packet capture.",
-				"Unable to open network interface "+Config::Inst()->GetInterface(0)+" for live capture: "+string(errbuf));
+				"Unable to open network interfaces for live capture: "+string(errbuf));
 			exit(EXIT_FAILURE);
 		}
 
-		/* ask pcap for the network address and mask of the device */
-		ret = pcap_lookupnet(Config::Inst()->GetInterface(0).c_str(), &netp, &maskp, errbuf);
-		if(ret == -1)
-		{
-			LOG(ERROR, "Unable to start packet capture.",
-				"Unable to get the network address and mask: "+string(strerror(errno)));
-			exit(EXIT_FAILURE);
-		}
 
-		if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0, maskp) == -1)
+		if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0, PCAP_NETMASK_UNKNOWN) == -1)
 		{
 			LOG(ERROR, "Unable to start packet capture.",
 				"Couldn't parse filter: "+string(filter_exp)+ " " + pcap_geterr(handle) +".");
@@ -771,14 +757,16 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 		//Prepare Packet structure
 		packet_info.ip_hdr = *ip_hdr;
 		packet_info.pcap_header = *pkthdr;
-		//If this is to the host
-		if(packet_info.ip_hdr.ip_dst.s_addr == hostAddr.sin_addr.s_addr)
+
+		//Default from haystack, switch if we match to a host ip
+		packet_info.fromHaystack = FROM_HAYSTACK_DP;
+		for(uint i = 0; i < hostAddrs.size(); i++)
 		{
-			packet_info.fromHaystack = FROM_LTM;
-		}
-		else
-		{
-			packet_info.fromHaystack = FROM_HAYSTACK_DP;
+			//If this is to the host
+			if(packet_info.ip_hdr.ip_dst.s_addr == hostAddrs[i].sin_addr.s_addr)
+			{
+				packet_info.fromHaystack = FROM_LTM;
+			}
 		}
 
 		//IF UDP or ICMP
@@ -854,15 +842,20 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 
 void LoadConfiguration()
 {
-	string hostAddrString = GetLocalIP(Config::Inst()->GetInterface(0).c_str());
-
-	if(hostAddrString.size() == 0)
+	vector<string> ifList = Config::Inst()->GetInterfaces();
+	hostAddrs.clear();
+	for(uint i = 0; i < ifList.size(); i++)
 	{
-		LOG(ERROR, "Bad ethernet interface, no IP's associated!","");
-		exit(EXIT_FAILURE);
+		struct sockaddr_in hostAddr;
+		string hostAddrString = GetLocalIP(Config::Inst()->GetInterface(i).c_str());
+		if(hostAddrString.size() == 0)
+		{
+			LOG(ERROR, "Bad ethernet interface, no IP's associated!","");
+			exit(EXIT_FAILURE);
+		}
+		inet_pton(AF_INET, hostAddrString.c_str(),&(hostAddr.sin_addr));
+		hostAddrs.push_back(hostAddr);
 	}
-
-	inet_pton(AF_INET,hostAddrString.c_str(),&(hostAddr.sin_addr));
 }
 
 
@@ -938,9 +931,15 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 {
 	//Path to the main log file
 	ifstream honeydConfFile(honeyDConfigPath.c_str());
-	vector <string> retAddresses;
-	retAddresses.push_back(GetLocalIP(Config::Inst()->GetInterface(0).c_str()));
+	vector<string> ifList = Config::Inst()->GetInterfaces();
+	vector<string> retAddresses;
+	while(!ifList.empty())
+	{
+		retAddresses.push_back(GetLocalIP(ifList.back().c_str()));
+		ifList.pop_back();
+	}
 
+	retAddresses.push_back(Config::Inst()->GetDoppelIp());
 	if( honeydConfFile == NULL)
 	{
 		LOG(ERROR, "Error opening log file. Does it exist?", "");

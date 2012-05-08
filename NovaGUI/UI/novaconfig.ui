@@ -23,7 +23,7 @@
      <verstretch>100</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QHBoxLayout" name="horizontalLayout">
+   <layout class="QHBoxLayout" name="menuTreeHLayout">
     <property name="spacing">
      <number>0</number>
     </property>
@@ -149,7 +149,7 @@
             <property name="flat">
              <bool>true</bool>
             </property>
-            <layout class="QVBoxLayout" name="verticalLayout">
+            <layout class="QVBoxLayout" name="generalPageVLayout">
              <item>
               <layout class="QHBoxLayout" name="interfaceHLayout">
                <item>
@@ -229,7 +229,7 @@
                <property name="flat">
                 <bool>true</bool>
                </property>
-               <layout class="QFormLayout" name="formLayout_4">
+               <layout class="QFormLayout" name="saFormLayout">
                 <item row="4" column="0">
                  <widget class="QLabel" name="saPortLabel">
                   <property name="sizePolicy">
@@ -453,7 +453,7 @@ p, li { white-space: pre-wrap; }
                <property name="flat">
                 <bool>true</bool>
                </property>
-               <layout class="QFormLayout" name="formLayout_3">
+               <layout class="QFormLayout" name="tcpFormLayout">
                 <item row="0" column="0">
                  <widget class="QLabel" name="tcpTimeoutLabel">
                   <property name="minimumSize">
@@ -1073,7 +1073,7 @@ p, li { white-space: pre-wrap; }
          </layout>
         </widget>
         <widget class="QWidget" name="haystackPage">
-         <layout class="QVBoxLayout" name="verticalLayout_2">
+         <layout class="QVBoxLayout" name="haystackPageVLayout">
           <item>
            <widget class="QGroupBox" name="dmGroupBox">
             <property name="title">
@@ -1082,7 +1082,7 @@ p, li { white-space: pre-wrap; }
             <property name="flat">
              <bool>true</bool>
             </property>
-            <layout class="QFormLayout" name="formLayout_2">
+            <layout class="QFormLayout" name="dmFormLayout">
              <item row="0" column="0" colspan="2">
               <widget class="QCheckBox" name="dmCheckBox">
                <property name="toolTip">
@@ -1407,7 +1407,7 @@ p, li { white-space: pre-wrap; }
                <property name="flat">
                 <bool>true</bool>
                </property>
-               <layout class="QGridLayout" name="gridLayout">
+               <layout class="QGridLayout" name="hsSummaryGridLayout">
                 <property name="leftMargin">
                  <number>0</number>
                 </property>
@@ -1674,7 +1674,7 @@ p, li { white-space: pre-wrap; }
          </layout>
         </widget>
         <widget class="QWidget" name="profilesPage">
-         <layout class="QHBoxLayout" name="horizontalLayout_7">
+         <layout class="QHBoxLayout" name="profilePageHLayout">
           <item>
            <widget class="QGroupBox" name="profileGroupBox">
             <property name="focusPolicy">
@@ -1686,7 +1686,7 @@ p, li { white-space: pre-wrap; }
             <property name="flat">
              <bool>true</bool>
             </property>
-            <layout class="QHBoxLayout" name="horizontalLayout_10" stretch="25,75">
+            <layout class="QHBoxLayout" name="profileTreeWidgetHLayout" stretch="25,75">
              <property name="leftMargin">
               <number>0</number>
              </property>
@@ -2023,7 +2023,7 @@ p, li { white-space: pre-wrap; }
                     </widget>
                    </item>
                    <item row="4" column="1">
-                    <layout class="QHBoxLayout" name="horizontalLayout_2">
+                    <layout class="QHBoxLayout" name="dropRateHLayout">
                      <item>
                       <widget class="QLabel" name="dropRateSetting">
                        <property name="sizePolicy">
@@ -2089,7 +2089,7 @@ p, li { white-space: pre-wrap; }
                     </widget>
                    </item>
                    <item row="6" column="0" colspan="2">
-                    <layout class="QHBoxLayout" name="horizontalLayout_8">
+                    <layout class="QHBoxLayout" name="profButtonHLayout">
                      <property name="spacing">
                       <number>0</number>
                      </property>
@@ -2274,7 +2274,7 @@ p, li { white-space: pre-wrap; }
                 </attribute>
                 <layout class="QHBoxLayout" name="portsHBox">
                  <item>
-                  <layout class="QFormLayout" name="formLayout">
+                  <layout class="QFormLayout" name="portFormLayout">
                    <property name="fieldGrowthPolicy">
                     <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
                    </property>
@@ -2521,7 +2521,7 @@ p, li { white-space: pre-wrap; }
         <property name="frameShadow">
          <enum>QFrame::Raised</enum>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_5">
+        <layout class="QHBoxLayout" name="buttonBoxHLayout">
          <property name="spacing">
           <number>0</number>
          </property>

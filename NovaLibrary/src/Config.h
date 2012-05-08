@@ -96,6 +96,7 @@ public:
     // Setters
     void AddInterface(std::string interface);
     void RemoveInterface(std::string interface);
+    void ClearInterfaces();
     void SetClassificationThreshold(double classificationThreshold);
     void SetClassificationTimeout(int classificationTimeout);
     void SetConfigFilePath(std::string configFilePath);

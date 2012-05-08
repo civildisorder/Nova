@@ -1324,7 +1324,6 @@ bool NovaConfig::SaveConfigurationToFile()
 	}
 	Config::Inst()->SetIsDmEnabled(ui.dmCheckBox->isChecked());
 	Config::Inst()->SetIsTraining(ui.trainingCheckBox->isChecked());
-	//XXX add interfaces from list
 	Config::Inst()->SetPathTrainingFile(this->ui.dataEdit->displayText().toStdString());
 	Config::Inst()->SetSaSleepDuration(this->ui.saAttemptsTimeEdit->displayText().toDouble());
 	Config::Inst()->SetSaMaxAttempts(this->ui.saAttemptsMaxEdit->displayText().toInt());
@@ -1334,6 +1333,25 @@ bool NovaConfig::SaveConfigurationToFile()
 	Config::Inst()->SetClassificationTimeout(this->ui.ceFrequencyEdit->displayText().toInt());
 	Config::Inst()->SetClassificationThreshold(this->ui.ceThresholdEdit->displayText().toDouble());
 	Config::Inst()->SetEnabledFeatures(ss.str());
+	QList<QAbstractButton *> qButtonList = m_interfaceCheckBoxes->buttons();
+	Config::Inst()->ClearInterfaces();
+	for(int i = 0; i < qButtonList.size(); i++)
+	{
+		QCheckBox * checkBoxPtr = (QCheckBox *)qButtonList.at(i);
+		if(checkBoxPtr->isChecked())
+		{
+			Config::Inst()->AddInterface(checkBoxPtr->text().toStdString());
+		}
+	}
+	qButtonList = m_radioButtons->buttons();
+	for(int i = 0; i < qButtonList.size(); i++)
+	{
+		QRadioButton * radioBtnPtr = (QRadioButton *)qButtonList.at(i);
+		if(radioBtnPtr->isChecked())
+		{
+			Config::Inst()->SetDoppelInterface(radioBtnPtr->text().toStdString());
+		}
+	}
 
 	ss.str("");
 	ss << ui.dmIPSpinBox_0->value() << "." << ui.dmIPSpinBox_1->value() << "." << ui.dmIPSpinBox_2->value() << "."
