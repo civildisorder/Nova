@@ -171,20 +171,19 @@ int RunNovaD()
 				+ Config::Inst()->GetPathTrainingCapFolder() + "/training" + buffer
 				+ ".dump";
 
+		trainingFileStream.open(trainingCapFile.data(), ios::app);
+
+		if(!trainingFileStream.is_open())
+		{
+			LOG(CRITICAL, "Unable to open the training capture file.",
+				"Unable to open training capture file at: "+trainingCapFile);
+			exit(EXIT_FAILURE);
+		}
 
 		if (Config::Inst()->GetReadPcap())
 		{
 			Config::Inst()->SetClassificationThreshold(0);
 			Config::Inst()->SetClassificationTimeout(0);
-
-			trainingFileStream.open(trainingCapFile.data(), ios::app);
-
-			if(!trainingFileStream.is_open())
-			{
-				LOG(CRITICAL, "Unable to open the training capture file.",
-					"Unable to open training capture file at: "+trainingCapFile);
-				exit(EXIT_FAILURE);
-			}
 		}
 		else
 		{
@@ -456,6 +455,11 @@ void RefreshStateFile()
 	out.close();
 }
 
+void CloseTrainingCapture()
+{
+	trainingFileStream.close();
+}
+
 void Reload()
 {
 	LoadConfiguration();
@@ -695,7 +699,10 @@ bool Start_Packet_Handler()
 
 	if(!Config::Inst()->GetReadPcap())
 	{
-		LoadStateFile();
+		if (!Config::Inst()->GetIsTraining())
+		{
+			LoadStateFile();
+		}
 
 		//Open in non-promiscuous mode, since we only want traffic destined for the host machine
 		handle = pcap_open_live(NULL, BUFSIZ, 0, 1000, errbuf);
