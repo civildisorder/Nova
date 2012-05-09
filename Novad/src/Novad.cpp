@@ -946,7 +946,6 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 	vector<string> retAddresses;
 	while(!ifList.empty())
 	{
-		cout << ifList.back() << endl;
 		retAddresses.push_back(GetLocalIP(ifList.back().c_str()));
 		ifList.pop_back();
 	}
