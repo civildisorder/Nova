@@ -755,7 +755,7 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 
 	/* let's start with the ether header... */
 	ethernet = (struct ether_header *) packet;
-	u_int16_t type = ethernet->ether_type;
+	u_int16_t type = ntohs(ethernet->ether_type);
 
 	/* Do a couple of checks to see what packet type we have..*/
 	if(type == ETHERTYPE_IP)
