@@ -100,11 +100,21 @@ NovaConfig::NovaConfig(QWidget *parent, string home)
 	ui.featureList->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(ui.featureList, SIGNAL(customContextMenuRequested(const QPoint &)), this,
 			SLOT(onFeatureClick(const QPoint &)));
+	connect(m_interfaceCheckBoxes, SIGNAL(buttonReleased(QAbstractButton *)), this,
+			SLOT(interfaceCheckBoxes_buttonClicked(QAbstractButton *)));
 }
 
 NovaConfig::~NovaConfig()
 {
 
+}
+
+void NovaConfig::interfaceCheckBoxes_buttonClicked(QAbstractButton * button)
+{
+	if(m_interfaceCheckBoxes->checkedButton() == NULL)
+	{
+		((QCheckBox *)button)->setChecked(true);
+	}
 }
 
 void NovaConfig::contextMenuEvent(QContextMenuEvent * event)
@@ -1060,7 +1070,11 @@ void NovaConfig::LoadNovadPreferences()
 		}
 	}
 	freeifaddrs(devices);
-	if(checkBoxes.size() == 1)
+	if(checkBoxes.size() >= 1)
+	{
+		m_interfaceCheckBoxes->setExclusive(false);
+	}
+	else
 	{
 		m_interfaceCheckBoxes->setExclusive(true);
 	}
@@ -1261,6 +1275,7 @@ void NovaConfig::on_okButton_clicked()
 			"Error: Unable to write to NOVA configuration file");
 		this->close();
 	}
+	LoadNovadPreferences();
 
 	//Clean up unused ports
 	m_honeydConfig->CleanPorts();
@@ -1389,6 +1404,8 @@ bool NovaConfig::SaveConfigurationToFile()
 //Exit the window and ignore any changes since opening or apply was pressed
 void NovaConfig::on_cancelButton_clicked()
 {
+	//Reloads from NOVAConfig
+	LoadNovadPreferences();
 	this->close();
 }
 

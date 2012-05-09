@@ -116,7 +116,7 @@ Config::Config()
 	SetDefaults();
 	LoadUserConfig();
 	pthread_rwlock_unlock(&m_lock);
-	LoadConfig();
+	LoadConfig_Internal();
 }
 
 Config::~Config()
@@ -124,8 +124,13 @@ Config::~Config()
 
 }
 
-// Loads the configuration file into the class's state data
 void Config::LoadConfig()
+{
+	LoadConfig_Internal();
+	LoadInterfaces();
+}
+// Loads the configuration file into the class's state data
+void Config::LoadConfig_Internal()
 {
 	pthread_rwlock_wrlock(&m_lock);
 	string line;
@@ -147,6 +152,7 @@ void Config::LoadConfig()
 			// INTERFACE
 			if(!line.substr(0, prefix.size()).compare(prefix))
 			{
+				m_interfaces.clear();
 				line = line.substr(prefix.size() + 1, line.size());
 				while(line.size() > 0)
 				{
@@ -174,8 +180,11 @@ void Config::LoadConfig()
 						{
 							default:
 							{
-								m_interfaces.push_back(interface);
-								isValid[prefixIndex] = true;
+								if(interface.size())
+								{
+									m_interfaces.push_back(interface);
+									isValid[prefixIndex] = true;
+								}
 								break;
 							}
 							case '.':

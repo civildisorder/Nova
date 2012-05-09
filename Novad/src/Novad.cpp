@@ -748,9 +748,10 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 
 	/* let's start with the ether header... */
 	ethernet = (struct ether_header *) packet;
+	u_int16_t type = ethernet->ether_type;
 
 	/* Do a couple of checks to see what packet type we have..*/
-	if(ntohs (ethernet->ether_type) == ETHERTYPE_IP)
+	if(type == ETHERTYPE_IP)
 	{
 		ip_hdr = (struct ip*)(packet + sizeof(struct ether_header));
 
@@ -829,13 +830,16 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 			}
 		}
 	}
-	else if(ntohs(ethernet->ether_type) == ETHERTYPE_ARP)
+	//If ARP or getting IEEE 802.3 traffic which uses the ethertype field for the payload size
+	else if((type == ETHERTYPE_ARP) || (type < 1535))
 	{
 		return;
 	}
 	else
 	{
-		LOG(ERROR, "Unknown Non-IP Packet Received. Nova is ignoring it.","");
+		stringstream ss;
+		ss << "Unknown Non-IP Packet Received with protocol: " << ethernet->ether_type << ". Nova is ignoring it.";
+		LOG(DEBUG, ss.str(), "");
 		return;
 	}
 }
@@ -935,11 +939,11 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 	vector<string> retAddresses;
 	while(!ifList.empty())
 	{
+		cout << ifList.back() << endl;
 		retAddresses.push_back(GetLocalIP(ifList.back().c_str()));
 		ifList.pop_back();
 	}
 
-	retAddresses.push_back(Config::Inst()->GetDoppelIp());
 	if( honeydConfFile == NULL)
 	{
 		LOG(ERROR, "Error opening log file. Does it exist?", "");

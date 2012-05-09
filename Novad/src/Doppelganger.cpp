@@ -189,8 +189,8 @@ void Doppelganger::InitDoppelganger()
 	commandLine = "sudo iptables -t nat -N DOPP";
 	if(system(commandLine.c_str()) != 0)
 	{
-		LOG(WARNING, "Error setting up system for Doppelganger", "Command '"+commandLine+"' was unsuccessful."
-			" Attempting to flush 'DOPP' rule chain if it already exists.");
+		/*LOG(NOTICE, "Error setting up system for Doppelganger", "Command '"+commandLine+"' was unsuccessful."
+			" Attempting to flush 'DOPP' rule chain if it already exists.");*/
 		commandLine = "sudo iptables -t nat -F DOPP";
 		if(system(commandLine.c_str()) != 0)
 		{
@@ -201,6 +201,11 @@ void Doppelganger::InitDoppelganger()
 	vector<string> ifList = Config::Inst()->GetInterfaces();
 	while(!ifList.empty())
 	{
+		if(!ifList.back().size())
+		{
+			ifList.pop_back();
+			continue;
+		}
 		string hostIP = GetLocalIP(ifList.back().c_str());
 		commandLine = "sudo iptables -t nat -I PREROUTING -d "+hostIP+" -j DOPP";
 		if(system(commandLine.c_str()) != 0)
@@ -229,7 +234,7 @@ void Doppelganger::ResetDoppelganger()
 	m_suspectKeys = m_suspectTable.GetKeys_of_HostileSuspects();
 
 	prefix = "sudo iptables -t nat -I DOPP -s ";
-	string suffix = " -j DNAT --to-destination "+Config::Inst()->GetDoppelIp();
+	string suffix = " -j DNAT --to-destination " + Config::Inst()->GetDoppelIp();
 
 	stringstream ss;
 	in_addr inAddr;
