@@ -49,7 +49,7 @@ using namespace Nova;
 extern SuspectTable suspects;
 extern TCPSessionHashTable SessionTable;
 
-extern vector<sockaddr_in> hostAddrs;
+extern vector<struct sockaddr_in> hostAddrs;
 
 //** Silent Alarm **
 extern struct sockaddr_in serv_addr;
@@ -312,7 +312,7 @@ void *UpdateIPFilter(void *ptr)
 				haystackDhcpAddresses = GetHaystackDhcpAddresses(dhcpListFile);
 				string haystackAddresses_csv = ConstructFilterString();
 
-				if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0,PCAP_NETMASK_UNKNOWN) == -1)
+				if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0, PCAP_NETMASK_UNKNOWN) == -1)
 				{
 					LOG(ERROR, "Unable to enable packet capture.",
 						"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handle));

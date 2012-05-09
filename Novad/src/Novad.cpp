@@ -59,7 +59,7 @@ pthread_rwlock_t sessionLock;
 //** Silent Alarm **
 struct sockaddr_in serv_addr;
 struct sockaddr* serv_addrPtr = (struct sockaddr *) &serv_addr;
-vector<sockaddr_in> hostAddrs;
+vector<struct sockaddr_in> hostAddrs;
 
 // Timestamps for the CE state file exiration of data
 time_t lastLoadTime;
@@ -705,7 +705,7 @@ bool Start_Packet_Handler()
 		}
 
 		//Open in non-promiscuous mode, since we only want traffic destined for the host machine
-		handle = pcap_open_live(NULL, BUFSIZ, 0, 1000, errbuf);
+		handle = pcap_open_live("any", BUFSIZ, 0, 1000, errbuf);
 
 		if(handle == NULL)
 		{
@@ -731,7 +731,6 @@ bool Start_Packet_Handler()
 		//"Main Loop"
 		//Runs the function "Packet_Handler" every time a packet is received
 		pthread_create(&TCP_timeout_thread, NULL, TCPTimeout, NULL);
-
 	    pcap_loop(handle, -1, Packet_Handler, NULL);
 	}
 	return false;
@@ -742,7 +741,6 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 	//Memory assignments moved outside packet handler to increase performance
 	int dest_port;
 	Packet packet_info;
-	struct ether_header *ethernet;  	/* net/ethernet.h */
 	struct ip *ip_hdr; 					/* The IP header */
 	char tcp_socket[55];
 
@@ -754,13 +752,12 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 
 
 	/* let's start with the ether header... */
-	ethernet = (struct ether_header *) packet;
-	u_int16_t type = ntohs(ethernet->ether_type);
+	u_int16_t type = ntohs(*(packet+14));
 
 	/* Do a couple of checks to see what packet type we have..*/
 	if(type == ETHERTYPE_IP)
 	{
-		ip_hdr = (struct ip*)(packet + sizeof(struct ether_header));
+		ip_hdr = (struct ip*)(packet+16);
 
 		//Prepare Packet structure
 		packet_info.ip_hdr = *ip_hdr;
@@ -845,7 +842,7 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 	else
 	{
 		stringstream ss;
-		ss << "Unknown Non-IP Packet Received with protocol: " << ethernet->ether_type << ". Nova is ignoring it.";
+		ss << "Unknown Non-IP Packet Received with protocol: " << type << ". Nova is ignoring it.";
 		LOG(DEBUG, ss.str(), "");
 		return;
 	}
