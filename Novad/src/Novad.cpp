@@ -456,8 +456,7 @@ void Reload()
 	// Reload the configuration file
 	Config::Inst()->LoadConfig();
 
-	// TODO DTC
-	//engine->LoadDataPointsFromFile(Config::Inst()->GetPathTrainingFile());
+	engine->Initialize();
 	Suspect suspectCopy;
 	vector<uint64_t> keys = suspects.GetAllKeys();
 	// Set everyone to be reclassified

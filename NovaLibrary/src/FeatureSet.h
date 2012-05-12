@@ -71,7 +71,11 @@ enum featureIndex: uint8_t
 	DISTINCT_IPS = 5,
 	DISTINCT_PORTS = 6,
 	PACKET_INTERVAL_MEAN = 7,
-	PACKET_INTERVAL_DEVIATION = 8
+	PACKET_INTERVAL_DEVIATION = 8,
+	TCP_RATIO_SYN_ACK = 9,
+	TCP_RATIO_SYN_FIN = 10,
+	TCP_RATIO_SYN_RST = 11,
+	TCP_RATIO_SYN_SYNACK = 12
 };
 
 namespace Nova{
@@ -173,6 +177,13 @@ private:
 
 	//Table of IP addresses and associated packet counts
 	IP_Table m_IPTable;
+
+	// For some TCP flag ratios and statistics
+	uint32_t rstCount;
+	uint32_t ackCount;
+	uint32_t synCount;
+	uint32_t finCount;
+	uint32_t synAckCount;
 
 	//XXX Temporarily using SANITY_CHECK/2, rather than that, we should serialize a total byte size before the
 	// feature data then proceed like before, this will allow Deserialized to perform a real sanity checking and

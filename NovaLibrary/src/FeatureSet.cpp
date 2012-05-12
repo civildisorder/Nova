@@ -58,6 +58,13 @@ void FeatureSet::ClearFeatureSet()
 	m_bytesTotal = 0;
 	m_lastTime = 0;
 
+	// Technically 0, but this fixes the div by 0 errors yet keeps the initial ratios correct
+	ackCount = 0;
+	finCount = 0;
+	rstCount = 0;
+	synCount = 0;
+	synAckCount = 0;
+
 	//Features
 	for(int i = 0; i < DIM; i++)
 	{
@@ -68,8 +75,8 @@ void FeatureSet::ClearFeatureSet()
 
 void FeatureSet::CalculateAll()
 {
-	// TODO DTC Use per engine isFeatureEnabled
 	CalculateTimeInterval();
+
 	if(Config::Inst()->IsFeatureEnabled(IP_TRAFFIC_DISTRIBUTION))
 	{
 			Calculate(IP_TRAFFIC_DISTRIBUTION);
@@ -114,6 +121,27 @@ void FeatureSet::CalculateAll()
 		}
 		Calculate(PACKET_INTERVAL_DEVIATION);
 	}
+
+	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_ACK))
+	{
+		Calculate(TCP_RATIO_SYN_ACK);
+	}
+
+	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_FIN))
+	{
+		Calculate(TCP_RATIO_SYN_FIN);
+	}
+
+	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_RST))
+	{
+		Calculate(TCP_RATIO_SYN_RST);
+	}
+
+	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_SYNACK))
+	{
+		Calculate(TCP_RATIO_SYN_SYNACK);
+	}
+
 }
 
 
@@ -234,6 +262,30 @@ void FeatureSet::Calculate(const uint32_t& featureDimension)
 			m_features[PACKET_INTERVAL_DEVIATION] = sqrt(variance);
 			break;
 		}
+
+		case TCP_RATIO_SYN_ACK:
+		{
+			m_features[TCP_RATIO_SYN_ACK] = ((double)synCount + 1)/((double)ackCount + 1);
+			break;
+		}
+		case TCP_RATIO_SYN_FIN:
+		{
+			m_features[TCP_RATIO_SYN_FIN] = ((double)synCount + 1)/((double)finCount + 1);
+			break;
+		}
+		case TCP_RATIO_SYN_RST:
+		{
+			m_features[TCP_RATIO_SYN_RST] = ((double)synCount + 1)/((double)rstCount + 1);
+			break;
+		}
+		case TCP_RATIO_SYN_SYNACK:
+		{
+			cout << "TCP stats: " << synCount << " " << synAckCount << " " << ackCount << " " << finCount << " " << rstCount << endl;
+			m_features[TCP_RATIO_SYN_SYNACK] = ((double)synCount + 1)/((double)synAckCount + 1);
+			break;
+		}
+
+
 		default:
 		{
 			break;
@@ -281,6 +333,33 @@ void FeatureSet::UpdateEvidence(const Packet& packet)
 			{
 				m_portTable[ntohs(packet.tcp_hdr.dest)]++;
 			}
+
+			if (packet.tcp_hdr.syn)
+			{
+				synCount++;
+			}
+
+			if (packet.tcp_hdr.ack)
+			{
+				ackCount++;
+			}
+
+			if (packet.tcp_hdr.rst)
+			{
+				rstCount++;
+			}
+
+			if (packet.tcp_hdr.fin)
+			{
+				finCount++;
+			}
+
+			if (packet.tcp_hdr.syn && packet.tcp_hdr.ack)
+			{
+				synAckCount++;
+			}
+
+
 			break;
 		}
 		//If ICMP
@@ -350,6 +429,12 @@ FeatureSet& FeatureSet::operator+=(FeatureSet &rhs)
 	m_packetCount += rhs.m_packetCount;
 	m_bytesTotal += rhs.m_bytesTotal;
 
+	synCount += rhs.synCount;
+	ackCount += rhs.ackCount;
+	finCount += rhs.finCount;
+	rstCount += rhs.rstCount;
+	synAckCount += rhs.synAckCount;
+
 	for(IP_Table::iterator it = rhs.m_IPTable.begin(); it != rhs.m_IPTable.end(); it++)
 	{
 		m_IPTable[it->first] += rhs.m_IPTable[it->first];
@@ -390,6 +475,12 @@ FeatureSet& FeatureSet::operator-=(FeatureSet &rhs)
 	m_totalInterval -= rhs.m_totalInterval;
 	m_packetCount -= rhs.m_packetCount;
 	m_bytesTotal -= rhs.m_bytesTotal;
+
+	synCount -= rhs.synCount;
+	ackCount -= rhs.ackCount;
+	finCount -= rhs.finCount;
+	rstCount -= rhs.rstCount;
+	synAckCount -= rhs.synAckCount;
 
 	for(IP_Table::iterator it = rhs.m_IPTable.begin(); it != rhs.m_IPTable.end(); it++)
 	{

@@ -17,6 +17,8 @@ public:
 	std::vector<double> engineWeights;
 
 	double Classify(Suspect *s);
+	void Initialize();
+	std::vector<featureIndex> removeDisabledFeatures(std::vector<featureIndex> engineFeatures);
 
 
 

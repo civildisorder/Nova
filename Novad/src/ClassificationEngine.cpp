@@ -37,6 +37,11 @@ normalizationType ClassificationEngine::m_normalization[] = {
 		LOGARITHMIC,
 		LOGARITHMIC,
 		LOGARITHMIC
+
+		,LINEAR
+		,LINEAR
+		,LINEAR
+		,LINEAR
 };
 
 ClassificationEngine::ClassificationEngine(std::vector<featureIndex> enabledFeatures)
@@ -52,13 +57,6 @@ ClassificationEngine::ClassificationEngine(std::vector<featureIndex> enabledFeat
 
 	m_featureIndexes = enabledFeatures;
 	m_squrtDim = m_featureIndexes.size();
-
-	for (int i = 0; i < m_featureIndexes.size(); i++)
-	{
-		cout << m_featureIndexes.at(i) << endl;
-	}
-
-
 }
 
 ClassificationEngine::~ClassificationEngine()
@@ -68,17 +66,21 @@ ClassificationEngine::~ClassificationEngine()
 
 void ClassificationEngine::FormKdTree()
 {
+	if (Config::Inst()->GetIsTraining())
+		return;
+
 	delete m_kdTree;
 	//Normalize the data points
 	//Foreach data point
 	for(uint j = 0;j < m_featureIndexes.size();j++)
 	{
+		featureIndex feature = m_featureIndexes.at(j);
 		//Foreach feature within the data point
 		for(int i=0;i < m_nPts;i++)
 		{
-			if(m_maxFeatureValues[j] != 0)
+			if(m_maxFeatureValues[m_featureIndexes.at(feature)] != 0)
 			{
-				m_normalizedDataPts[i][j] = Normalize(m_normalization[j], m_dataPts[i][j], m_minFeatureValues[j], m_maxFeatureValues[j]);
+				m_normalizedDataPts[i][feature] = Normalize(m_normalization[feature], m_dataPts[i][feature], m_minFeatureValues[feature], m_maxFeatureValues[feature]);
 			}
 			else
 			{
@@ -97,6 +99,9 @@ void ClassificationEngine::FormKdTree()
 
 double ClassificationEngine::Classify(Suspect *suspect)
 {
+	if (Config::Inst()->GetIsTraining())
+		return -1;
+
 	int k = Config::Inst()->GetK();
 	double d;
 	featureIndex fi;
@@ -261,6 +266,9 @@ void ClassificationEngine::PrintPt(ostream &out, ANNpoint p)
 
 void ClassificationEngine::LoadDataPointsFromFile(string inFilePath)
 {
+	if (Config::Inst()->GetIsTraining())
+		return;
+
 	ifstream myfile (inFilePath.data());
 	string line;
 
@@ -472,7 +480,7 @@ double ClassificationEngine::Normalize(normalizationType type, double value, dou
 		}
 		default:
 		{
-			//logger->Logging(ERROR, "Normalization failed: Normalization type unkown");
+			LOG(ERROR, "Normalization failed: Normalization type unkown", "");
 			return 0;
 		}
 
@@ -506,4 +514,9 @@ void ClassificationEngine::WriteDataPointsToFile(string outFilePath, ANNkd_tree*
 	}
 	myfile.close();
 
+}
+
+std::vector<featureIndex> ClassificationEngine::GetEnabledFeatures()
+{
+	return m_featureIndexes;
 }

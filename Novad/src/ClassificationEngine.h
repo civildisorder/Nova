@@ -72,6 +72,8 @@ public:
 	//		p 	- ANN point to print
 	void PrintPt(std::ostream &out, ANNpoint p);
 
+	std::vector<featureIndex> GetEnabledFeatures();
+
 	Doppelganger *m_dopp;
 
 private:
