@@ -21,12 +21,21 @@ block headerAdditions
     
     function deleteSelectedItems() {
       var items = grid.selection.getSelected();
+      var names = [];
       dojo.forEach(items, function(selectedItem) {
-        console.log(grid.store.getValues(selectedItem, "Name"));
-        now.deleteNode(grid.store.getValues(selectedItem, "Name"));
+        names.push(grid.store.getValues(selectedItem, "Name"));
+        
       });
+        now.deleteNodes(names, errorMessageCallback);
 
-      // Reload the page
+    }
+
+    function errorMessageCallback(sucess, message) {
+      if(sucess != true) {
+        var dialog = new dijit.Dialog({title: "Error", content: "Unable to complete operation due to error: " + message});
+        dialog.show();
+        return;
+      }
       location.reload(true);
     }
 
@@ -38,7 +47,16 @@ block headerAdditions
         dialog.show();
         return;
       }
-      window.location.href = "editHoneydNode?node=" + grid.store.getValues(items[0], "Name");
+
+      var nodeName = grid.store.getValues(items[0], "Name");
+
+      if (nodeName == "Doppelganger") 
+      {
+        var dialog = new dijit.Dialog({title: "Invalid Selection", content: "The Doppelganger node can not be edited here"});
+        dialog.show();
+        return; 
+      }
+      window.location.href = "editHoneydNode?node=" + nodeName; 
     }
 
 

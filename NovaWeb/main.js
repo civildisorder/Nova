@@ -236,7 +236,7 @@ app.post('/configureNovaSave', function(req, res) {
 		}
 	}
 	
-	res.render('saveRedirect.jade', { locals: {redirectLink: "'/configureNova'"}})	
+	res.render('saveRedirect.jade', { locals: {redirectLink: "'/configNova'"}})	
 });
 
 // Functions to be called by clients
@@ -283,33 +283,48 @@ everyone.now.sendAllSuspects = function(callback)
 
 
 // Deletes a honeyd node
-everyone.now.deleteNode = function(nodeName)
+everyone.now.deleteNodes = function(nodeNames, callback)
 {
-	console.log("Deleting honeyd node " + nodeName);
-	honeydConfig.DeleteNode(nodeName);
-	honeydConfig.SaveAllTemplates();
+	var nodeName;
+	for (var i = 0; i < nodeNames.length; i++) {
+		nodeName = nodeNames[i];
+	
+		console.log("Deleting honeyd node " + nodeName);
+
+		if (!honeydConfig.DeleteNode(nodeName)) {
+			callback(false, "Failed to delete node " + nodeName);
+			return;
+		}
+
+		if (!honeydConfig.SaveAllTemplates())
+		{
+			callback(false, "Failed to save XML templates");
+			return;
+		}
+	}
+	
+	callback(true, "");
 }
 
-everyone.now.deleteProfile = function(profileName)
+everyone.now.deleteProfiles = function(profileNames, callback)
 {
-	var returnValue = true;
+	var profileName;
+	for (var i = 0; i < profileNames.length; i++) {
+		profileName = profileNames[i];
 	
-	if (!honeydConfig.DeleteProfile(profileName)) {
-		returnValue = false;
-	}
+		if (!honeydConfig.DeleteProfile(profileName)) {
+			callback(false, "Failed to delete profile " + profileName);
+			return;
+		}
 	
 	
-	if (!honeydConfig.SaveAllTemplates()) {
-		returnValue = false;
-	}
-	
-	if (returnValue) {
-		console.log("Deleted honeyd profile " + profileName);
-	} else {
-		console.log("Failed deleted honeyd profile " + profileName);
+		if (!honeydConfig.SaveAllTemplates()) {
+			callback(false, "Failed to save XML templates");
+			return;
+		}
 	}
 
-	return returnValue;
+	callback(true, "");
 }
 
 everyone.now.GetProfile = function(profileName, callback) {
@@ -408,6 +423,14 @@ var distributeSuspect = function(suspect)
 	objCopy(suspect, s);
 	everyone.now.OnNewSuspect(s)
 };
+
+var distributeAllSuspectsCleared = function()
+{
+	console.log("Distribute all suspects cleared called in main.js");
+	everyone.now.AllSuspectsCleared();
+}
+
+nova.registerOnAllSuspectsCleared(distributeAllSuspectsCleared);
 nova.registerOnNewSuspect(distributeSuspect);
 
 
