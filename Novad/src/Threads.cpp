@@ -47,8 +47,7 @@ using namespace Nova;
 
 // Maintains a list of suspects and information on network activity
 extern SuspectTable suspects;
-extern struct sockaddr_in hostAddr;
-extern vector<sockaddr_in> hostAddrs;
+extern vector<struct sockaddr_in> hostAddrs;
 
 //** Silent Alarm **
 extern struct sockaddr_in serv_addr;
@@ -63,11 +62,10 @@ extern time_t lastSaveTime;
 //HS Vars
 extern string dhcpListFile;
 extern vector<string> haystackDhcpAddresses;
-extern pcap_t *handle;
+extern vector<pcap_t *> handles;
 
 extern int notifyFd;
 extern int watch;
-
 
 extern ClassificationEngine *engine;
 
@@ -302,8 +300,8 @@ void *UpdateIPFilter(void *ptr)
 		{
 			int BUF_LEN = (1024 * (sizeof(struct inotify_event)) + 16);
 			char buf[BUF_LEN];
-			struct bpf_program fp; /* The compiled filter expression */
 			char filter_exp[64];
+			struct bpf_program *fp = new struct bpf_program();
 
 			// Blocking call, only moves on when the kernel notifies it that file has been changed
 			int readLen = read(notifyFd, buf, BUF_LEN);
@@ -313,18 +311,23 @@ void *UpdateIPFilter(void *ptr)
 						IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
 				haystackDhcpAddresses = GetHaystackDhcpAddresses(dhcpListFile);
 				string haystackAddresses_csv = ConstructFilterString();
-
-				if(pcap_compile(handle, &fp, haystackAddresses_csv.data(), 0,PCAP_NETMASK_UNKNOWN) == -1)
+				for(uint i = 0; i < handles.size(); i++)
 				{
-					LOG(ERROR, "Unable to enable packet capture.",
-						"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handle));
-				}
-				if(pcap_setfilter(handle, &fp) == -1)
-				{
-					LOG(ERROR, "Unable to enable packet capture.",
-						"Couldn't install pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handle));
+					if(pcap_compile(handles[i], fp, haystackAddresses_csv.data(), 0,PCAP_NETMASK_UNKNOWN) == -1)
+					{
+						LOG(ERROR, "Unable to enable packet capture.",
+							"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
+					}
+					if(pcap_setfilter(handles[i], fp) == -1)
+					{
+						LOG(ERROR, "Unable to enable packet capture.",
+							"Couldn't install pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
+					}
+					//Free the compiled filter program after assignment, it is no longer needed after set filter
+					pcap_freecode(fp);
 				}
 			}
+			delete fp;
 		}
 		else
 		{
@@ -336,6 +339,18 @@ void *UpdateIPFilter(void *ptr)
 		}
 	}
 
+	return NULL;
+}
+
+void *StartPcapLoop(void *ptr)
+{
+	u_char * index = new u_char(*(u_char *)ptr);
+	if((*index >= handles.size()) || (handles[*index] == NULL))
+	{
+		LOG(CRITICAL, "Invalid pcap handle provided, unable to start pcap loop!", "");
+		exit(EXIT_FAILURE);
+	}
+	pcap_loop(handles[*index], -1, Packet_Handler, index);
 	return NULL;
 }
 }

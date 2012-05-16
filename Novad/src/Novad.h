@@ -107,6 +107,7 @@ void UpdateAndStore(const in_addr_t& key);
 // Updates data and classification for a suspect
 void UpdateAndClassify(const in_addr_t& key);
 
+//Logs and prints if any packets were dropped since the last time this was called
 void CheckForDroppedPackets();
 
 

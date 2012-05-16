@@ -45,7 +45,11 @@ void *UpdateIPFilter(void *ptr);
 // IE: Not all TCP sessions get torn down properly. Sometimes they just end midstram
 // This thread looks for old tcp sessions and declares them terminated
 //		ptr - Required for pthread start routines
-void *TCPTimeout( void *ptr );
+void *TCPTimeout(void *ptr);
+
+
+//Initialization function for a new pcap thread
+void *StartPcapLoop(void *ptr);
 
 }
 
