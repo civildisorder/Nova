@@ -121,6 +121,8 @@ protected:
 
 private Q_SLOTS:
 
+void interfaceCheckBoxes_buttonClicked(QAbstractButton * button);
+
 // Right click action on a feature, we manually connect it so no need for proper prefix
 void onFeatureClick(const QPoint & pos);
 

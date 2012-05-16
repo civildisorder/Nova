@@ -260,6 +260,12 @@ private:
 
 	bool LoadUserConfig();
 
+	//Private version of LoadConfig so the public version can call LoadInterfaces()
+	//	LoadInterfaces cannot be called until m_instance has been created, but needs to execute after every load
+	//	However the constructor calls LoadConfig, so we use a private version instead that doesn't include
+	//	LoadInterfaces() which is called elsewhere
+	void LoadConfig_Internal();
+
 };
 }
 

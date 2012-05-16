@@ -56,7 +56,10 @@ SuspectTable suspectsSinceLastSave;
 struct sockaddr_in serv_addr;
 struct sockaddr* serv_addrPtr = (struct sockaddr *) &serv_addr;
 vector<struct sockaddr_in> hostAddrs;
+<<<<<<< HEAD
 vector<uint> dropCounts;
+=======
+>>>>>>> 36fe75aea1774bcca12f7bb50ef2169392241ef2
 
 // Timestamps for the CE state file exiration of data
 time_t lastLoadTime;
@@ -857,7 +860,9 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 	}
 	else
 	{
-		LOG(ERROR, "Unknown Non-IP Packet Received. Nova is ignoring it.","");
+		stringstream ss;
+		ss << "Unknown Non-IP Packet Received with protocol: " << type << ". Nova is ignoring it.";
+		LOG(DEBUG, ss.str(), "");
 		return;
 	}
 }
@@ -977,7 +982,6 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 	ifstream honeydConfFile(honeyDConfigPath.c_str());
 	vector<string> retAddresses;
 
-	retAddresses.push_back(Config::Inst()->GetDoppelIp());
 	if( honeydConfFile == NULL)
 	{
 		LOG(ERROR, "Error opening log file. Does it exist?", "");

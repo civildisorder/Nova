@@ -27,7 +27,7 @@ namespace Nova
 bool StartHaystack()
 {
 	stringstream ss;
-	ss.str("nohup sudo honeyd ");
+	ss << "nohup sudo honeyd ";
 	vector<string> ifList = Config::Inst()->GetInterfaces();
 	while(!ifList.empty())
 	{
