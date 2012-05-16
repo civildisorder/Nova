@@ -188,6 +188,8 @@ int RunNovaD()
 	{
 		pthread_create(&classificationLoopThread,NULL,ClassificationLoop, NULL);
 		pthread_create(&silentAlarmListenThread,NULL,SilentAlarmLoop, NULL);
+		pthread_detach(classificationLoopThread);
+		pthread_detach(silentAlarmListenThread);
 	}
 
 	// If we're not reading from a pcap, monitor for IP changes in the honeyd file
@@ -199,6 +201,7 @@ int RunNovaD()
 		{
 			watch = inotify_add_watch (notifyFd, dhcpListFile.c_str(), IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
 			pthread_create(&ipUpdateThread, NULL, UpdateIPFilter,NULL);
+			pthread_detach(ipUpdateThread);
 		}
 		else
 		{
