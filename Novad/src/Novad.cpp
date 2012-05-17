@@ -56,10 +56,7 @@ SuspectTable suspectsSinceLastSave;
 struct sockaddr_in serv_addr;
 struct sockaddr* serv_addrPtr = (struct sockaddr *) &serv_addr;
 vector<struct sockaddr_in> hostAddrs;
-<<<<<<< HEAD
 vector<uint> dropCounts;
-=======
->>>>>>> 36fe75aea1774bcca12f7bb50ef2169392241ef2
 
 // Timestamps for the CE state file exiration of data
 time_t lastLoadTime;
@@ -864,7 +861,7 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 	else
 	{
 		stringstream ss;
-		ss << "Unknown Non-IP Packet Received with protocol: " << type << ". Nova is ignoring it.";
+		ss << "Unknown Non-IP Packet Received with protocol: " << (uint8_t)(ntohs(((struct ether_header *)packet)->ether_type)) << ". Nova is ignoring it.";
 		LOG(DEBUG, ss.str(), "");
 		return;
 	}

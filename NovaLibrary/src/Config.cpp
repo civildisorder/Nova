@@ -192,9 +192,6 @@ void Config::LoadConfig_Internal()
 							{
 								break;
 							}
-
-							delete column;
-							delete line;
 						}
 					}
 				}
