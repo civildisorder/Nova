@@ -50,9 +50,9 @@ Suspect::~Suspect()
 }
 
 
-Suspect::Suspect(const Packet& packet)
+Suspect::Suspect(const Evidence& packet)
 {
-	m_IpAddress = packet.ip_hdr.ip_src;
+	m_IpAddress.s_addr = packet.m_evidencePacket.ip_src;
 	m_hostileNeighbors = 0;
 	m_classification = -1;
 	m_isHostile = false;
@@ -133,9 +133,9 @@ string Suspect::ToString()
 	return ss.str();
 }
 
-void Suspect::AddEvidence(const Packet& packet)
+void Suspect::AddEvidence(const Evidence& evidence)
 {
-	m_unsentFeatures.UpdateEvidence(packet);
+	m_unsentFeatures.UpdateEvidence(evidence);
 	m_needsClassificationUpdate = true;
 	m_isLive = (Config::Inst()->GetReadPcap());
 }

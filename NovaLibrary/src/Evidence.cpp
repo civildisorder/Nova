@@ -24,6 +24,18 @@ using namespace std;
 namespace Nova
 {
 
+//Default Constructor
+Evidence::Evidence()
+{
+	m_next = NULL;
+	m_evidencePacket.dst_port = 0;
+	m_evidencePacket.ip_dst = 0;
+	m_evidencePacket.ip_len = 0;
+	m_evidencePacket.ip_p = 0;
+	m_evidencePacket.ip_src = 0;
+	m_evidencePacket.ts = 0;
+}
+
 Evidence::Evidence(const u_char * const& packet_at_ip_header, const pcap_pkthdr * const& pkthdr)
 {
 	//Get timestamp

@@ -65,18 +65,6 @@ public:
 	// Returns true on Success, and false if the suspect already exists
 	bool AddNewSuspect(Suspect *suspect);
 
-	// Adds the Suspect pointed to in 'suspect' into the table using the source of the packet as the key;
-	// 		packet: copy of the packet you whish to create a suspect from
-	// Returns true on Success, and false if the suspect already exists
-	bool AddNewSuspect(const Packet& packet);
-
-	// If the table contains a suspect associated with 'key', then it adds 'packet' to it's evidence
-	//		key: IP address of the suspect as a uint value (host byte order)
-	//		packet: packet struct to be added into the suspect's list of evidence.
-	// Returns (true) if the call succeeds, (false) if the suspect could not be located
-	// Note: this is faster than Checking out a suspect adding the evidence and checking it in but is equivalent
-	bool AddEvidenceToSuspect(const in_addr_t& key, const Packet& packet);
-
 	bool ClassifySuspect(const in_addr_t& key);
 
 	void UpdateAllSuspects();

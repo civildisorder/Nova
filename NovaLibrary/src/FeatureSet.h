@@ -20,9 +20,10 @@
 #ifndef FEATURESET_H_
 #define FEATURESET_H_
 
-#include "HashMap.h"
-#include "HashMapStructs.h"
 #include "Defines.h"
+#include "Evidence.h"
+#include "HashMapStructs.h"
+
 #include <pcap.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -118,7 +119,7 @@ public:
 
 	// Processes incoming evidence before calculating the features
 	//		packet - packet headers of new packet
-	void UpdateEvidence(const Packet& packet);
+	void UpdateEvidence(const Evidence& packet);
 
 	// Serializes the contents of the global 'features' array
 	//		buf - Pointer to buffer where serialized feature set is to be stored

@@ -807,6 +807,11 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 
 			//Prepare Packet structure
 			Evidence * evidencePacket = new Evidence(packet + sizeof(struct ether_header), pkthdr);
+			if(localIPs[*index] == evidencePacket->m_evidencePacket.ip_dst)
+			{
+				//manually setting dst ip to 0.0.0.1 designates the packet was to a real host not a haystack node
+				evidencePacket->m_evidencePacket.ip_dst = 1;
+			}
 			suspectEvidence.InsertEvidence(evidencePacket);
 			return;
 		}

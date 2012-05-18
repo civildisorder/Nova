@@ -364,27 +364,17 @@ void *ConsumerLoop(void *ptr)
 	{
 		//Blocks on a mutex/condition if there's no evidence to process
 		Evidence * cur = suspectEvidence.GetEvidence();
-
-		//Code to clean up memory until evidence is properly handled.
-		// we really should be converting this into some object that can be
-		// easily added into a suspect, could possibly use a feature set.
 		Evidence * temp = NULL;
 
 		Suspect curSuspect = suspects.CheckOut(cur->m_evidencePacket.ip_src);
-
-		while(cur->m_next != NULL)
+		while(cur != NULL)
 		{
-			portSort.push_back(cur->m_evidencePacket.dst_port);
-			sizeSort.push_back(cur->m_evidencePacket.ip_len);
-			ipSort.push_back(cur->m_evidencePacket.ip_dst)
-			intervalSort.push_back(cur->m_evidencePacket.ts);
+			curSuspect.AddEvidence(*cur);
 			temp = cur;
 			cur = (Evidence *)temp->m_next;
 			delete temp;
 		}
-		std::sort(portSort.front(), portSort.end());
-		//XXX reimplement AddEvidenceToSuspect, which should take some object pre-processed in the above while loop,
-		// and include it into a suspect's FeatureSet
+		suspects.CheckIn(&curSuspect);
 	}
 	return NULL;
 }

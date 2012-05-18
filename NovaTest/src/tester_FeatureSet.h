@@ -11,28 +11,28 @@ protected:
 		Config::Inst()->SetEnabledFeatures("111111111");
 
 		// First test packet
-		Packet p1;
-		p1.ip_hdr.ip_p = 6;
-		p1.fromHaystack = false;
+		Evidence p1;
+		p1.m_evidencePacket.ip_p = 6;
 		// These are just made up input values that make the math easy
-		p1.tcp_hdr.dest = 80;
-		p1.ip_hdr.ip_dst.s_addr = 1;
+		p1.m_evidencePacket.dst_port = 80;
+		p1.m_evidencePacket.ip_dst = 1;
+		p1.m_evidencePacket.ip_src = 123456;
 
 		// Note: the byte order gets flipped for this
-		p1.ip_hdr.ip_len = (u_short)1;
-		p1.pcap_header.ts.tv_sec = 10;
+		p1.m_evidencePacket.ip_len = (u_short)1;
+		p1.m_evidencePacket.ts = 10;
 
 
 		// Second test packet
-		Packet p2;
-		p2.ip_hdr.ip_p = 6;
-		p2.fromHaystack = true;
-		p2.tcp_hdr.dest = 20;
-		p2.ip_hdr.ip_dst.s_addr = 2;
+		Evidence p2;
+		p2.m_evidencePacket.ip_p = 6;
+		p2.m_evidencePacket.dst_port = 20;
+		p2.m_evidencePacket.ip_dst = 2;
+		p2.m_evidencePacket.ip_src = 98765;
 
 		// Note: the byte order gets flipped for this
-		p2.ip_hdr.ip_len = (u_short)1;
-		p2.pcap_header.ts.tv_sec = 20;
+		p2.m_evidencePacket.ip_len = (u_short)1;
+		p2.m_evidencePacket.ts = 20;
 
 
 		fset.UpdateEvidence(p1);

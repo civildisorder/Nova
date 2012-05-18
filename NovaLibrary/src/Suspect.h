@@ -59,7 +59,7 @@ public:
 
 	// Constructor from a Packet
 	//		packet - Used to set the IP address and initial evidence of the suspect
-	Suspect(const Packet& packet);
+	Suspect(const Evidence& packet);
 
 	// Converts suspect into a human readable std::string
 	//		featureEnabled: Array of size DIM that specifies which features to return in the std::string
@@ -67,7 +67,7 @@ public:
 	std::string ToString();
 
 	// Proccesses a packet in m_evidence and puts them into the suspects unsent FeatureSet data
-	void AddEvidence(const Packet& packet);
+	void AddEvidence(const Evidence& packet);
 
 	// Calculates the feature set for this suspect
 	void CalculateFeatures();

@@ -35,7 +35,7 @@ struct _evidencePacket //* Total of 18 bytes */
 	uint32_t ip_src;	//Source IPv4 address
 	uint32_t ip_dst;	//Destination IPv4 address
 	uint16_t dst_port;	//Destination Port (UDP or TCP Only)
-	uint32_t ts;		//Arrival Timestamp (in seconds)
+	time_t ts;		//Arrival Timestamp (in seconds)
 };
 
 class Evidence
@@ -49,6 +49,8 @@ public:
 	Evidence(const u_char * const& packet_at_ip_header, const pcap_pkthdr * const& pkthdr);
 
 	Evidence(const _evidencePacket& packet);
+
+	Evidence();
 
 };
 

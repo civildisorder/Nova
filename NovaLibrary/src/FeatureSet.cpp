@@ -253,34 +253,22 @@ void FeatureSet::CalculateTimeInterval()
 	}
 }
 
-void FeatureSet::UpdateEvidence(const Packet& packet)
+void FeatureSet::UpdateEvidence(const Evidence& packet)
 {
 	// Ensure our assumptions about valid packet fields are true
-	if (packet.ip_hdr.ip_dst.s_addr == 0)
+	if(packet.m_evidencePacket.ip_dst == 0)
 	{
 		LOG(DEBUG, "Got packet with invalid source IP address of 0. Skipping.", "");
 		return;
 	}
-	switch(packet.ip_hdr.ip_p)
+	switch(packet.m_evidencePacket.ip_p)
 	{
 		//If UDP
 		case 17:
-		{
-			//Avoid empty key error
-			if(packet.udp_hdr.dest)
-			{
-				m_portTable[ntohs(packet.udp_hdr.dest)]++;
-			}
-			break;
-		}
 		//If TCP
 		case 6:
 		{
-			//Avoid empty key error
-			if(packet.tcp_hdr.dest)
-			{
-				m_portTable[ntohs(packet.tcp_hdr.dest)]++;
-			}
+			m_portTable[packet.m_evidencePacket.dst_port];
 			break;
 		}
 		//If ICMP
@@ -297,36 +285,25 @@ void FeatureSet::UpdateEvidence(const Packet& packet)
 	}
 
 	m_packetCount++;
-	m_bytesTotal += ntohs(packet.ip_hdr.ip_len);
-
-	//If from haystack
-	if(packet.fromHaystack)
-	{
-		m_IPTable[packet.ip_hdr.ip_dst.s_addr]++;
-	}
-	//If from local host, put into designated bin
-	else
-	{
-		m_IPTable[1]++;
-	}
-
-	m_packTable[ntohs(packet.ip_hdr.ip_len)]++;
+	m_bytesTotal += packet.m_evidencePacket.ip_len;
+	m_IPTable[packet.m_evidencePacket.ip_dst]++;
+	m_packTable[packet.m_evidencePacket.ip_len]++;
 
 	if(m_lastTime != 0)
 	{
-		m_intervalTable[packet.pcap_header.ts.tv_sec - m_lastTime]++;
+		m_intervalTable[packet.m_evidencePacket.ts - m_lastTime]++;
 	}
 
-	m_lastTime = packet.pcap_header.ts.tv_sec;
+	m_lastTime = packet.m_evidencePacket.ts;
 
 	//Accumulate to find the lowest Start time and biggest end time.
-	if(packet.pcap_header.ts.tv_sec < m_startTime)
+	if(packet.m_evidencePacket.ts < m_startTime)
 	{
-		m_startTime = packet.pcap_header.ts.tv_sec;
+		m_startTime = packet.m_evidencePacket.ts;
 	}
-	if( packet.pcap_header.ts.tv_sec > m_endTime)
+	if(packet.m_evidencePacket.ts > m_endTime)
 	{
-		m_endTime =  packet.pcap_header.ts.tv_sec;
+		m_endTime =  packet.m_evidencePacket.ts;
 		CalculateTimeInterval();
 	}
 }
