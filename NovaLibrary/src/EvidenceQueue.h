@@ -44,7 +44,6 @@ public:
 private:
 
 	pthread_mutex_t m_lock;
-	volatile uint32_t m_count;
 	volatile Evidence * m_first;
 	volatile Evidence * m_last;
 };

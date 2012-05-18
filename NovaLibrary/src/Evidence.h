@@ -28,7 +28,7 @@ using namespace std;
 namespace Nova
 {
 
-struct _evidencePacket //* Total of 17 bytes */
+struct _evidencePacket //* Total of 18 bytes */
 {
 	uint16_t ip_len; 	//Length in bytes
 	uint8_t ip_p;		//Ip protocol (UDP, TCP or ICMP)
@@ -46,11 +46,9 @@ public:
 	_evidencePacket m_evidencePacket;
 	volatile Evidence * m_next;
 
-	Evidence(u_char * packet, pcap_pkthdr * pkthdr);
+	Evidence(const u_char * const& packet_at_ip_header, const pcap_pkthdr * const& pkthdr);
 
-	Evidence(_evidencePacket packet);
-
-private:
+	Evidence(const _evidencePacket& packet);
 
 };
 

@@ -29,6 +29,7 @@ namespace Nova
 	EvidenceTable::EvidenceTable()
 	{
 		pthread_mutex_init(&m_lock, NULL);
+		pthread_cond_init(&m_cond, NULL);
 		uint64_t initKey = 0;
 		initKey--;
 		m_table.set_empty_key(initKey);
@@ -56,6 +57,8 @@ namespace Nova
 		{
 			Evidence * temp = new Evidence(packet->m_evidencePacket);
 			m_processingList.Push(temp);
+			//Wake up any consumers waiting for evidence
+			pthread_cond_signal(&m_cond);
 		}
 		pthread_mutex_unlock(&m_lock);
 	}
@@ -65,6 +68,13 @@ namespace Nova
 		//We use manual mutex locking instead of a lock object for performance reasons
 		pthread_mutex_lock(&m_lock);
 		Evidence * lookup = m_processingList.Pop();
+		//While we are unable to get evidence (other consumers got it first)
+		while(lookup == NULL)
+		{
+			//block until evidence is inserted
+			pthread_cond_wait(&m_cond, &m_lock);
+			lookup = m_processingList.Pop();
+		}
 		Evidence * ret = NULL;
 		//If we get any entry
 		if(lookup)

@@ -24,13 +24,13 @@ using namespace std;
 namespace Nova
 {
 
-Evidence::Evidence(u_char * packet_at_ip_header, pcap_pkthdr* pkthdr)
+Evidence::Evidence(const u_char * const& packet_at_ip_header, const pcap_pkthdr * const& pkthdr)
 {
 	//Get timestamp
 	m_evidencePacket.ts = pkthdr->ts.tv_sec;
 
 	//Copy out vals from header
-	u_char* offset = packet_at_ip_header + 9; // @9 - read 2
+	const u_char* offset = packet_at_ip_header + 9; // @9 - read 2
 	m_evidencePacket.ip_len = ntohs((uint16_t)*packet_at_ip_header);
 	offset += 7; // @16 - read 1
 	m_evidencePacket.ip_p = (uint8_t)*packet_at_ip_header;
@@ -52,7 +52,7 @@ Evidence::Evidence(u_char * packet_at_ip_header, pcap_pkthdr* pkthdr)
 	}
 }
 
-Evidence::Evidence(_evidencePacket packet)
+Evidence::Evidence(const _evidencePacket& packet)
 {
 	m_evidencePacket = packet;
 	m_next = NULL;

@@ -19,6 +19,7 @@
 #include "messaging/MessageManager.h"
 #include "ClassificationEngine.h"
 #include "ProtocolHandler.h"
+#include "EvidenceTable.h"
 #include "SuspectTable.h"
 #include "FeatureSet.h"
 #include "NovaUtil.h"
@@ -51,6 +52,8 @@ using namespace Nova;
 SuspectTable suspects;
 // Suspects not yet written to the state file
 SuspectTable suspectsSinceLastSave;
+//Contains packet evidence yet to be included in a suspect
+EvidenceTable suspectEvidence;
 
 //** Silent Alarm **
 struct sockaddr_in serv_addr;
@@ -86,8 +89,7 @@ pthread_t trainingLoopThread;
 pthread_t silentAlarmListenThread;
 pthread_t ipUpdateThread;
 
-vector<Packet> packet_headers;
-vector<int> fileDescriptors;
+vector<uint32_t> localIPs;
 
 namespace Nova
 {
@@ -702,9 +704,13 @@ bool Start_Packet_Handler()
 		for(uint i = 0; i < ifList.size(); i++)
 		{
 			dropCounts.push_back(0);
+			string ipAddr = GetLocalIP(ifList.back().c_str());
+			struct in_addr tempAddr;
+			inet_aton(ipAddr.c_str(), &tempAddr);
+			localIPs.push_back(ntohl(tempAddr.s_addr));
 			string temp = haystackAddresses_csv;
 			temp.append(" || ");
-			temp.append(GetLocalIP(ifList.back().c_str()));
+			temp.append(ipAddr);
 			handles[i] = pcap_create(ifList[i].c_str(), errbuf);
 
 			if(handles[i] == NULL)
@@ -767,21 +773,20 @@ bool Start_Packet_Handler()
 			}
 			pcap_freecode(fp);
 		}
-		for(u_char i = 0; i < handles.size(); i++)
+		for(u_char i = 1; i < handles.size(); i++)
 		{
 			pthread_t readThread;
 			u_char * temp = new u_char(i);
-			packet_headers.push_back(Packet());
 			pthread_create(&readThread, NULL, StartPcapLoop, &temp);
 		}
-		//"Main Loop"
-		//Runs the function "Packet_Handler" every time a packet is received
-		pcap_loop(handles[0], -1, Packet_Handler, NULL);
 		if((handles.empty()) || (handles[0] == NULL))
 		{
 			LOG(CRITICAL, "Invalid pcap handle provided, unable to start pcap loop!", "");
 			exit(EXIT_FAILURE);
 		}
+		//"Main Loop"
+		//Runs the function "Packet_Handler" every time a packet is received
+		pcap_loop(handles[0], -1, Packet_Handler, NULL);
 	}
 	return false;
 }
@@ -794,76 +799,29 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 		LOG(ERROR, "Failed to capture packet!","");
 		return;
 	}
-
-
-	//If we have an IPv4 packet
-	if(ntohs(((struct ether_header *)packet)->ether_type) == ETHERTYPE_IP)
+	switch(ntohs(((struct ether_header *)packet)->ether_type))
 	{
-		//Prepare Packet structure
-		packet_headers[*index].ip_hdr = *(struct ip*)(packet + sizeof(struct ether_header));
-		packet_headers[*index].pcap_header = *pkthdr;
-
-		//Default from haystack, switch if we match to a host ip
-		packet_headers[*index].fromHaystack = FROM_HAYSTACK_DP;
-		for(uint i = 0; i < hostAddrs.size(); i++)
+		//IPv4, currently the only handled case
+		case ETHERTYPE_IP:
 		{
-			//If this is to the host
-			if(packet_headers[*index].ip_hdr.ip_dst.s_addr == hostAddrs[i].sin_addr.s_addr)
-			{
-				packet_headers[*index].fromHaystack = FROM_LTM;
-			}
-		}
 
-		switch(packet_headers[*index].ip_hdr.ip_p)
-		{
-			//IF UDP
-			case 17:
-			{
-				packet_headers[*index].udp_hdr = *(struct udphdr*)(packet + sizeof(struct ether_header) + sizeof(struct ip));
-				break;
-			}
-			//IF ICMP
-			case 1:
-			{
-				packet_headers[*index].icmp_hdr = *(struct icmphdr*)(packet + sizeof(struct ether_header) + sizeof(struct ip));
-				break;
-			}
-			//IF TCP
-			case 6:
-			{
-				packet_headers[*index].tcp_hdr = *(struct tcphdr*)(packet + sizeof(struct ether_header) + sizeof(struct ip));
-				break;
-			}
-			default:
-			{
-				break;
-			}
+			//Prepare Packet structure
+			Evidence * evidencePacket = new Evidence(packet + sizeof(struct ether_header), pkthdr);
+			suspectEvidence.InsertEvidence(evidencePacket);
+			return;
 		}
-		UpdateSuspect(packet_headers[*index]);
-
-		// Allow for continuous classification
-		if(!Config::Inst()->GetClassificationTimeout())
+		//Ignore ARP
+		case ETHERTYPE_ARP:
 		{
-			if(!Config::Inst()->GetIsTraining())
-			{
-				UpdateAndClassify(packet_headers[*index].ip_hdr.ip_src.s_addr);
-			}
-			else
-			{
-				UpdateAndStore(packet_headers[*index].ip_hdr.ip_src.s_addr);
-			}
+			return;
 		}
-	}
-	else if(ntohs(((struct ether_header *)packet)->ether_type) == ETHERTYPE_ARP)
-	{
-		return;
-	}
-	else
-	{
-		stringstream ss;
-		ss << "Unknown Non-IP Packet Received with protocol: " << (uint8_t)(ntohs(((struct ether_header *)packet)->ether_type)) << ". Nova is ignoring it.";
-		LOG(DEBUG, ss.str(), "");
-		return;
+		default:
+		{
+			stringstream ss;
+			ss << "Ignoring a packet with unhandled protocol #" << (uint8_t)(ntohs(((struct ether_header *)packet)->ether_type));
+			LOG(DEBUG, ss.str(), "");
+			return;
+		}
 	}
 }
 
@@ -1016,19 +974,9 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 	return retAddresses;
 }
 
-void UpdateSuspect(const Packet& packet)
+void UpdateSuspect(const Evidence& packet)
 {
-	//Attempt to add the evidence into the table, if it fails the suspect doesn't exist in this table
-	if(!suspects.AddEvidenceToSuspect(packet.ip_hdr.ip_src.s_addr, packet))
-	{
-		suspects.AddNewSuspect(packet);
-	}
 
-	//Attempt to add the evidence into the table, if it fails the suspect doesn't exist in this table
-	if(!Config::Inst()->GetIsTraining() && !suspectsSinceLastSave.AddEvidenceToSuspect(packet.ip_hdr.ip_src.s_addr, packet))
-	{
-		suspectsSinceLastSave.AddNewSuspect(packet);
-	}
 }
 
 

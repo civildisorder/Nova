@@ -18,6 +18,7 @@
 
 #include "ClassificationEngine.h"
 #include "ProtocolHandler.h"
+#include "EvidenceTable.h"
 #include "SuspectTable.h"
 #include "FeatureSet.h"
 #include "NovaUtil.h"
@@ -68,6 +69,7 @@ extern int notifyFd;
 extern int watch;
 
 extern ClassificationEngine *engine;
+extern EvidenceTable suspectEvidence;
 
 namespace Nova
 {
@@ -350,7 +352,41 @@ void *StartPcapLoop(void *ptr)
 		LOG(CRITICAL, "Invalid pcap handle provided, unable to start pcap loop!", "");
 		exit(EXIT_FAILURE);
 	}
+	pthread_t consumer;
+	pthread_create(&consumer, NULL, ConsumerLoop, NULL);
 	pcap_loop(handles[*index], -1, Packet_Handler, index);
 	return NULL;
 }
+
+void *ConsumerLoop(void *ptr)
+{
+	while(true)
+	{
+		//Blocks on a mutex/condition if there's no evidence to process
+		Evidence * cur = suspectEvidence.GetEvidence();
+
+		//Code to clean up memory until evidence is properly handled.
+		// we really should be converting this into some object that can be
+		// easily added into a suspect, could possibly use a feature set.
+		Evidence * temp = NULL;
+
+		Suspect curSuspect = suspects.CheckOut(cur->m_evidencePacket.ip_src);
+
+		while(cur->m_next != NULL)
+		{
+			portSort.push_back(cur->m_evidencePacket.dst_port);
+			sizeSort.push_back(cur->m_evidencePacket.ip_len);
+			ipSort.push_back(cur->m_evidencePacket.ip_dst)
+			intervalSort.push_back(cur->m_evidencePacket.ts);
+			temp = cur;
+			cur = (Evidence *)temp->m_next;
+			delete temp;
+		}
+		std::sort(portSort.front(), portSort.end());
+		//XXX reimplement AddEvidenceToSuspect, which should take some object pre-processed in the above while loop,
+		// and include it into a suspect's FeatureSet
+	}
+	return NULL;
+}
+
 }

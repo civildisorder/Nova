@@ -51,6 +51,7 @@ private:
 	EvidenceQueue m_processingList;
 	EvidenceHashTable m_table;
 	pthread_mutex_t m_lock;
+	pthread_cond_t m_cond;
 };
 
 }

@@ -20,6 +20,7 @@
 #define NOVAD_H_
 
 #include "HashMapStructs.h"
+#include "Evidence.h"
 #include "Defines.h"
 #include "Suspect.h"
 #include <arpa/inet.h>
@@ -95,7 +96,7 @@ void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_cha
 
 // Updates a suspect with evidence to be processed later
 //		packet : Packet headers to used for the evidence
-void UpdateSuspect(const Packet& packet);
+void UpdateSuspect(const Evidence& packet);
 
 // Masks the kill signals of a thread so they will get
 // sent to the main thread's signal handler.
