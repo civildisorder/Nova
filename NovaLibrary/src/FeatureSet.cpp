@@ -281,7 +281,7 @@ void FeatureSet::Calculate(const uint32_t& featureDimension)
 		}
 		case TCP_RATIO_SYN_SYNACK:
 		{
-			cout << "TCP stats: " << synCount << " " << synAckCount << " " << ackCount << " " << finCount << " " << rstCount << endl;
+			//cout << "TCP stats: " << synCount << " " << synAckCount << " " << ackCount << " " << finCount << " " << rstCount << endl;
 			m_features[TCP_RATIO_SYN_SYNACK] = ((double)synCount + 1)/((double)synAckCount + 1);
 			break;
 		}

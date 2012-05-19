@@ -132,22 +132,22 @@ string Suspect::ToString()
 
 	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_ACK))
 	{
-		ss << "TCP Syn/Ack Ratio" << m_features.m_features[TCP_RATIO_SYN_ACK] << "\n";
+		ss << "TCP Syn/Ack Ratio: " << m_features.m_features[TCP_RATIO_SYN_ACK] << "\n";
 	}
 
 	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_FIN))
 	{
-		ss << "TCP Syn/Fin Ratio" << m_features.m_features[TCP_RATIO_SYN_FIN] << "\n";
+		ss << "TCP Syn/Fin Ratio: " << m_features.m_features[TCP_RATIO_SYN_FIN] << "\n";
 	}
 
 	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_RST))
 	{
-		ss << "TCP Syn/Rst Ratio" << m_features.m_features[TCP_RATIO_SYN_RST] << "\n";
+		ss << "TCP Syn/Rst Ratio: " << m_features.m_features[TCP_RATIO_SYN_RST] << "\n";
 	}
 
 	if (Config::Inst()->IsFeatureEnabled(TCP_RATIO_SYN_SYNACK))
 	{
-		ss << "TCP Syn/SynAck Ratio" << m_features.m_features[TCP_RATIO_SYN_SYNACK] << "\n";
+		ss << "TCP Syn/SynAck Ratio: " << m_features.m_features[TCP_RATIO_SYN_SYNACK] << "\n";
 	}
 
 	return ss.str();

@@ -154,9 +154,9 @@ double ClassificationEngine::Classify(Suspect *suspect)
 			dists,								// distance (returned)
 			Config::Inst()->GetEps());								// error bound
 
-	for(int i = 0; i < DIM; i++)
+	for(uint i = 0; i < m_featureIndexes.size(); i++)
 	{
-		fi = (featureIndex)i;
+		fi = (featureIndex)m_featureIndexes.at(i);
 		suspect->SetFeatureAccuracy(fi, 0);
 	}
 	suspect->SetHostileNeighbors(0);
@@ -173,6 +173,8 @@ double ClassificationEngine::Classify(Suspect *suspect)
 		{
 				double distance = (aNN[m_featureIndexes.at(j)] - m_kdTree->thePoints()[nnIdx[i]][m_featureIndexes.at(j)]);
 
+				cout << "Feature index " << m_featureIndexes.at(j) << " has diff of " << aNN[m_featureIndexes.at(j)] << " - " << m_kdTree->thePoints()[nnIdx[i]][m_featureIndexes.at(j)] << endl;
+
 				if(distance < 0)
 				{
 					distance *= -1;
@@ -180,6 +182,12 @@ double ClassificationEngine::Classify(Suspect *suspect)
 
 				fi = (featureIndex)m_featureIndexes.at(j);
 				d  = suspect->GetFeatureAccuracy(fi) + distance;
+
+				if (fi == HAYSTACK_EVENT_FREQUENCY && distance)
+				{
+					cout << "Distance was " << distance << endl;
+					cout << "Dists was " << dists[i] << endl;
+				}
 				suspect->SetFeatureAccuracy(fi, d);
 		}
 
@@ -215,9 +223,9 @@ double ClassificationEngine::Classify(Suspect *suspect)
 			}
 		}
 	}
-	for(int j = 0; j < DIM; j++)
+	for(uint j = 0; j < m_featureIndexes.size(); j++)
 	{
-		fi = (featureIndex)j;
+		fi = (featureIndex)m_featureIndexes.at(j);
 		d = suspect->GetFeatureAccuracy(fi) / k;
 		suspect->SetFeatureAccuracy(fi, d);
 	}
