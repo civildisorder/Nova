@@ -85,7 +85,7 @@ public:
     int GetSaveFreq();
     int GetTcpCheckFreq();
     int GetTcpTimout();
-    int GetThinningDistance();
+    double GetThinningDistance();
 
     double GetClassificationThreshold();
     double GetSaSleepDuration();
@@ -122,7 +122,7 @@ public:
     void SetSaveFreq(int saveFreq);
     void SetTcpCheckFreq(int tcpCheckFreq);
     void SetTcpTimout(int tcpTimout);
-    void SetThinningDistance(int thinningDistance);
+    void SetThinningDistance(double thinningDistance);
     void SetUseTerminals(bool useTerminals);
     void SetKey(std::string key);
     void SetNeigbors(std::vector<in_addr_t> neighbors);
@@ -195,7 +195,7 @@ private:
 	int m_classificationTimeout;
 	int m_saPort;
 	int m_k;
-	int m_thinningDistance;
+	double m_thinningDistance;
 	int m_saveFreq;
 	int m_dataTTL;
 	int m_saMaxAttempts;

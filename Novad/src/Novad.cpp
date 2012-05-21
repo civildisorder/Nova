@@ -156,10 +156,14 @@ int RunNovaD()
 		// We suffix the training capture files with the date/time
 		time_t rawtime;
 		time(&rawtime);
-		struct tm * timeinfo = localtime(&rawtime);
+		struct tm *timeinfo = localtime(&rawtime);
 		char buffer[40];
 		strftime(buffer, 40, "%m-%d-%y_%H-%M-%S", timeinfo);
 
+		if (system(string("mkdir " + Config::Inst()->GetPathTrainingCapFolder()).c_str()))
+		{
+			// Not really an problem, throws compiler warning if we don't catch the system call though
+		}
 		trainingCapFile = Config::Inst()->GetPathHome() + "/"
 				+ Config::Inst()->GetPathTrainingCapFolder() + "/training" + buffer
 				+ ".dump";
