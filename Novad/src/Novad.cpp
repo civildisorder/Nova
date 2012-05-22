@@ -78,8 +78,11 @@ vector<string> haystackAddresses;
 vector<string> haystackDhcpAddresses;
 vector<pcap_t *> handles;
 
-int notifyFd;
-int watch;
+int honeydDHCPNotifyFd;
+int honeydDHCPWatch;
+
+int whitelistNotifyFd;
+int whitelistWatch;
 
 
 ClassificationEngine *engine;
@@ -88,6 +91,7 @@ pthread_t classificationLoopThread;
 pthread_t trainingLoopThread;
 pthread_t silentAlarmListenThread;
 pthread_t ipUpdateThread;
+pthread_t ipWhitelistUpdateThread;
 
 vector<uint32_t> localIPs;
 
@@ -193,16 +197,28 @@ int RunNovaD()
 		pthread_create(&silentAlarmListenThread,NULL,SilentAlarmLoop, NULL);
 		pthread_detach(classificationLoopThread);
 		pthread_detach(silentAlarmListenThread);
+
+		whitelistNotifyFd = inotify_init ();
+		if(whitelistNotifyFd > 0)
+		{
+			whitelistWatch = inotify_add_watch (whitelistNotifyFd, Config::Inst()->GetPathWhitelistFile().c_str(), IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
+			pthread_create(&ipWhitelistUpdateThread, NULL, UpdateWhitelistIPFilter,NULL);
+			pthread_detach(ipWhitelistUpdateThread);
+		}
+		else
+		{
+			LOG(ERROR, "Unable to set up file watcher for the Whitelist IP file.","");
+		}
 	}
 
 	// If we're not reading from a pcap, monitor for IP changes in the honeyd file
 	if (!Config::Inst()->GetReadPcap())
 	{
-		notifyFd = inotify_init ();
+		honeydDHCPNotifyFd = inotify_init ();
 
-		if(notifyFd > 0)
+		if(honeydDHCPNotifyFd > 0)
 		{
-			watch = inotify_add_watch (notifyFd, dhcpListFile.c_str(), IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
+			honeydDHCPWatch = inotify_add_watch (honeydDHCPNotifyFd, dhcpListFile.c_str(), IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
 			pthread_create(&ipUpdateThread, NULL, UpdateIPFilter,NULL);
 			pthread_detach(ipUpdateThread);
 		}
@@ -658,7 +674,8 @@ bool Start_Packet_Handler()
 	bpf_u_int32 netp; /* ip          */
 
 	haystackAddresses = GetHaystackAddresses(Config::Inst()->GetPathConfigHoneydHS());
-	haystackDhcpAddresses = GetHaystackDhcpAddresses(dhcpListFile);
+	haystackDhcpAddresses = GetIpAddresses(dhcpListFile);
+	whitelistIpAddresses = GetIpAddresses(Config::Inst()->GetPathWhitelistFile());
 	haystackAddresses_csv = ConstructFilterString();
 
 	//If we're reading from a packet capture file
@@ -855,14 +872,15 @@ void LoadConfiguration()
 //Convert monitored ip address into a csv string
 string ConstructFilterString()
 {
-	string filterString = "";
+	// Whitelist local traffic
+	string filterString = "not src 0.0.0.0 && ";
 	{
 		//Get list of interfaces and insert associated local IP's
 		vector<string> ifList = Config::Inst()->GetInterfaces();
 		while(ifList.size())
 		{
 			//Remove and add the host entry
-			filterString += "dst host ";
+			filterString += "not src host ";
 			//Look up associated IP with the interface
 			filterString += GetLocalIP(ifList.back().c_str());
 			ifList.pop_back();
@@ -870,7 +888,7 @@ string ConstructFilterString()
 			//If we have another local IP or there is at least one haystack ip, add 'or' conditional
 			if(ifList.size() || haystackAddresses.size() || haystackDhcpAddresses.size())
 			{
-				filterString += " || ";
+				filterString += " && ";
 			}
 		}
 	}
@@ -880,36 +898,36 @@ string ConstructFilterString()
 	while(hsAddresses.size())
 	{
 		//Remove and add the haystack host entry
-		filterString += "dst host ";
+		filterString += "not src host ";
 		filterString += hsAddresses.back();
 		hsAddresses.pop_back();
 
 		//If there is at least one more haystack static or dynamic ip, add 'or' conditional
 		if(hsAddresses.size() || haystackDhcpAddresses.size())
 		{
-			filterString += " || ";
+			filterString += " && ";
 		}
 	}
 
-	//Insert dynamically assigned ip's
+	// Whitelist the DHCP haystack node IP addresses
 	hsAddresses = haystackDhcpAddresses;
 	while(hsAddresses.size())
 	{
 		//Remove and add the haystack host entry
-		filterString += "dst host ";
+		filterString += "not src host ";
 		filterString += hsAddresses.back();
 		hsAddresses.pop_back();
 
 		//If there is at least one more haystack ip, add 'or' conditional
 		if(hsAddresses.size())
 		{
-			filterString += " || ";
+			filterString += " && ";
 		}
 	}
 
 	if(filterString == "")
 	{
-		filterString = "dst host 0.0.0.0";
+		filterString = "not src 0.0.0.0 && ";
 	}
 
 	LOG(DEBUG, "Pcap filter string is "+filterString,"");
@@ -917,31 +935,32 @@ string ConstructFilterString()
 }
 
 
-vector <string> GetHaystackDhcpAddresses(string dhcpListFile)
+vector <string> GetIpAddresses(string ipListFile)
 {
-	ifstream dhcpFile(dhcpListFile.data());
-	vector<string> haystackDhcpAddresses;
+	ifstream ipListFileStream(ipListFile.data());
+	vector<string> whitelistedAddresses;
 
-	if(dhcpFile.is_open())
+	if(ipListFileStream.is_open())
 	{
-		while(dhcpFile.good())
+		while(ipListFileStream.good())
 		{
 			string line;
-			getline (dhcpFile,line);
-			if(strcmp(line.c_str(), ""))
+			getline (ipListFileStream,line);
+			if(strcmp(line.c_str(), "")&& line.at(0) != '#' )
 			{
-				haystackDhcpAddresses.push_back(line);
+				whitelistedAddresses.push_back(line);
 			}
 		}
-		dhcpFile.close();
+		ipListFileStream.close();
 	}
 	else
 	{
-		LOG(ERROR,"Unable to open file: " + dhcpListFile, "");
+		LOG(ERROR,"Unable to open file: " + ipListFile, "");
 	}
 
-	return haystackDhcpAddresses;
+	return whitelistedAddresses;
 }
+
 
 vector <string> GetHaystackAddresses(string honeyDConfigPath)
 {

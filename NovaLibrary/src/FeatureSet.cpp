@@ -287,7 +287,7 @@ void FeatureSet::UpdateEvidence(const Evidence& packet)
 		//If untracked IP protocol or error case ignore it
 		default:
 		{
-			LOG(DEBUG, "Dropping packet with unhandled IP protocol." , "");
+			//LOG(DEBUG, "Dropping packet with unhandled IP protocol." , "");
 			return;
 		}
 	}
