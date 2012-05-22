@@ -386,26 +386,34 @@ Suspect SuspectTable::GetSuspectStatus(const in_addr_t& key)
 bool SuspectTable::Erase(const in_addr_t& key)
 {
 	Lock lock(&m_lock, false);
-	if(IsValidKey_NonBlocking(key))
+	try
 	{
-		m_lockTable[key].deleted = true;
-		for(vector<uint64_t>::iterator vit = m_keys.begin(); vit != m_keys.end(); vit++)
+		if(IsValidKey_NonBlocking(key))
 		{
-			if(*vit == key)
+			m_lockTable[key].deleted = true;
+			for(vector<uint64_t>::iterator vit = m_keys.begin(); vit != m_keys.end(); vit++)
 			{
-				m_keys.erase(vit);
-				break;
+				if(*vit == key)
+				{
+					m_keys.erase(vit);
+					break;
+				}
 			}
+			SuspectHashTable::iterator it = m_suspectTable.find(key);
+			if(it != m_suspectTable.end())
+			{
+				Suspect *suspectPtr = m_suspectTable[key];
+				m_suspectTable.erase(key);
+				delete suspectPtr;
+			}
+			CleanSuspectLock(key);
+			return true;
 		}
-		SuspectHashTable::iterator it = m_suspectTable.find(key);
-		if(it != m_suspectTable.end())
-		{
-			Suspect *suspectPtr = m_suspectTable[key];
-			m_suspectTable.erase(key);
-			delete suspectPtr;
-		}
-		CleanSuspectLock(key);
-		return true;
+	}
+	catch(Nova::hashMapException &s)
+	{
+		LOG(ERROR, "Unable to erase suspect due to exception: " + string(s.what()), "");
+		return false;
 	}
 	return false;
 }
@@ -646,8 +654,9 @@ uint32_t SuspectTable::ReadContents(ifstream *in, time_t expirationTime)
 			return (sizeof(expirationTime) + sizeof(dataSize) + dataSize);
 		}
 
-		u_char tableBuffer[dataSize];
-		in->read((char*) tableBuffer, dataSize);
+		u_char *tableBuffer = new u_char[dataSize];
+
+		in->read((char*)tableBuffer, dataSize);
 		lengthLeft -= dataSize;
 
 		// Read each suspect
@@ -660,6 +669,7 @@ uint32_t SuspectTable::ReadContents(ifstream *in, time_t expirationTime)
 				offset += newSuspect->Deserialize(tableBuffer+ offset, ALL_FEATURE_DATA);
 			} catch (Nova::hashMapException& e) {
 				LOG(ERROR, "The state file may be corrupt, a hash table invalid key exception was caught during deserialization", "");
+				delete tableBuffer;
 				return 0;
 			}
 
@@ -720,6 +730,8 @@ uint32_t SuspectTable::ReadContents(ifstream *in, time_t expirationTime)
 				}
 			}
 		}
+
+		delete[] tableBuffer;
 	}
 	ret = (uint32_t)in->tellg() - cur;
 	return ret;
