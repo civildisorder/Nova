@@ -715,7 +715,7 @@ bool Start_Packet_Handler()
 			string temp = haystackAddresses_csv;
 			temp.append(" || ");
 			temp.append(ipAddr);
-			handles[i] = pcap_create(ifList[i].c_str(), errbuf);
+			handles.push_back(pcap_create(ifList[i].c_str(), errbuf));
 
 			if(handles[i] == NULL)
 			{

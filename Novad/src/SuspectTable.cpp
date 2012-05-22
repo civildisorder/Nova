@@ -124,10 +124,10 @@ bool SuspectTable::AddNewSuspect(Suspect *suspect)
 // Adds the Suspect pointed to in 'suspect' into the table using the source of the packet as the key;
 // 		packet: copy of the packet you whish to create a suspect from
 // Returns true on Success, and false if the suspect already exists
-bool SuspectTable::AddNewSuspect(const Packet& packet)
+bool SuspectTable::AddNewSuspect(const Evidence& evidence)
 {
 	Lock lock(&m_lock, false);
-	Suspect *suspect = new Suspect(packet);
+	Suspect *suspect = new Suspect(evidence);
 	in_addr_t key = suspect->GetIpAddress();
 	//If we return false then there is no suspect at this ip address yet
 	if(!IsValidKey_NonBlocking(key))
@@ -162,30 +162,6 @@ bool SuspectTable::AddNewSuspect(const Packet& packet)
 	return false;
 }
 
-// If the table contains a suspect associated with 'key', then it adds 'packet' to it's evidence
-//		key: IP address of the suspect as a uint value (host byte order)
-//		packet: packet struct to be added into the suspect's list of evidence.
-// Returns true if the call succeeds, false if the suspect could not be located
-// Note: this is faster than Checking out a suspect adding the evidence and checking it in but is equivalent
-bool SuspectTable::AddEvidenceToSuspect(const in_addr_t& key, const Packet& packet)
-{
-	Lock lock(&m_lock, false);
-	if(IsValidKey_NonBlocking(key))
-	{
-		//Wait for the suspect lock, this call releases the table while blocking.
-		LockSuspect(key);
-		if(!IsValidKey_NonBlocking(key))
-		{
-			UnlockSuspect(key);
-			return false;
-		}
-		Suspect *suspect = m_suspectTable[key];
-		suspect->AddEvidence(packet);
-		UnlockSuspect(key);
-		return true;
-	}
-	return false;
-}
 // Updates a suspects evidence and calculates the FeatureSet
 //		key: IP address of the suspect as a uint value (host byte order)
 // Returns (true) if the call succeeds, (false) if the suspect doesn't exist or doesn't need updating

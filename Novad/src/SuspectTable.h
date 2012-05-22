@@ -65,6 +65,11 @@ public:
 	// Returns true on Success, and false if the suspect already exists
 	bool AddNewSuspect(Suspect *suspect);
 
+	// Adds the Suspect pointed to in 'suspect' into the table using the source of the evidence as the key;
+	// 		evidence: copy of the packet you whish to create a suspect from
+	// Returns true on Success, and false if the suspect already exists
+	bool AddNewSuspect(const Evidence& evidence);
+
 	bool ClassifySuspect(const in_addr_t& key);
 
 	void UpdateAllSuspects();

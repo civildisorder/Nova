@@ -144,21 +144,25 @@ void FeatureSet::Calculate(const uint32_t& featureDimension)
 		case PORT_TRAFFIC_DISTRIBUTION:
 		{
 			m_features[PORT_TRAFFIC_DISTRIBUTION] = 0;
-			double portMax = 0;
-			for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
-			{
-				if(it->second > portMax)
-				{
-					portMax = it->second;
-				}
-			}
-			for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
-			{
-				m_features[PORT_TRAFFIC_DISTRIBUTION] += ((double)it->second / portMax);
-			}
 			if(m_portTable.size())
 			{
-				m_features[PORT_TRAFFIC_DISTRIBUTION] = m_features[PORT_TRAFFIC_DISTRIBUTION] / (double)m_portTable.size();
+				double portDivisor = 0;
+				for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
+				{
+					//get the maximum port entry for normalization
+					if(it->second > portDivisor)
+					{
+						portDivisor = it->second;
+					}
+				}
+				//Multiply the maximum entry with the size to get the divisor
+				portDivisor = portDivisor * ((double)m_portTable.size());
+				long long unsigned int temp = 0;
+				for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
+				{
+					temp += it->second;
+				}
+				m_features[PORT_TRAFFIC_DISTRIBUTION] = ((double)temp)/portDivisor;
 			}
 			break;
 		}
@@ -265,6 +269,10 @@ void FeatureSet::UpdateEvidence(const Evidence& packet)
 	{
 		//If UDP
 		case 17:
+		{
+			m_portTable[packet.m_evidencePacket.dst_port];
+			break;
+		}
 		//If TCP
 		case 6:
 		{
