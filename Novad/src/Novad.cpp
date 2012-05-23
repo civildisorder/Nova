@@ -76,6 +76,7 @@ ofstream trainingFileStream;
 string dhcpListFile = "/var/log/honeyd/ipList";
 vector<string> haystackAddresses;
 vector<string> haystackDhcpAddresses;
+vector<string> whitelistIpAddresses;
 vector<pcap_t *> handles;
 
 int honeydDHCPNotifyFd;
@@ -83,7 +84,6 @@ int honeydDHCPWatch;
 
 int whitelistNotifyFd;
 int whitelistWatch;
-
 
 ClassificationEngine *engine;
 
@@ -103,7 +103,7 @@ int RunNovaD()
 	Config::Inst();
 	MessageManager::Initialize(DIRECTION_TO_UI);
 
-	if (!LockNovad())
+	if(!LockNovad())
 	{
 		cout << "ERROR: Novad is already running. Please close all other instances before continuing." << endl;
 		exit(EXIT_FAILURE);
@@ -164,7 +164,7 @@ int RunNovaD()
 		char buffer[40];
 		strftime(buffer, 40, "%m-%d-%y_%H-%M-%S", timeinfo);
 
-		if (system(string("mkdir " + Config::Inst()->GetPathTrainingCapFolder()).c_str()))
+		if(system(string("mkdir " + Config::Inst()->GetPathTrainingCapFolder()).c_str()))
 		{
 			// Not really an problem, throws compiler warning if we don't catch the system call though
 		}
@@ -181,7 +181,7 @@ int RunNovaD()
 			exit(EXIT_FAILURE);
 		}
 
-		if (Config::Inst()->GetReadPcap())
+		if(Config::Inst()->GetReadPcap())
 		{
 			Config::Inst()->SetClassificationThreshold(0);
 			Config::Inst()->SetClassificationTimeout(0);
@@ -212,7 +212,7 @@ int RunNovaD()
 	}
 
 	// If we're not reading from a pcap, monitor for IP changes in the honeyd file
-	if (!Config::Inst()->GetReadPcap())
+	if(!Config::Inst()->GetReadPcap())
 	{
 		honeydDHCPNotifyFd = inotify_init ();
 
@@ -230,7 +230,7 @@ int RunNovaD()
 
 	Start_Packet_Handler();
 
-	if (!Config::Inst()->GetIsTraining())
+	if(!Config::Inst()->GetIsTraining())
 	{
 		//Shouldn't get here!
 		LOG(CRITICAL, "Main thread ended. This should never happen, something went very wrong.", "");
@@ -365,14 +365,14 @@ void LoadStateFile()
 			// Copy the file
 			stringstream copyCommand;
 			copyCommand << "mv " << Config::Inst()->GetPathCESaveFile() << " " << fileName;
-			if (system(copyCommand.str().c_str()) == -1) {
+			if(system(copyCommand.str().c_str()) == -1) {
 				LOG(ERROR, "There was a problem when attempting to move the corrupt state file. System call failed: " + copyCommand.str(), "");
 			}
 
 			// Recreate an empty file
 			stringstream touchCommand;
 			touchCommand << "touch " << Config::Inst()->GetPathCESaveFile();
-			if (system(touchCommand.str().c_str()) == -1) {
+			if(system(touchCommand.str().c_str()) == -1) {
 				LOG(ERROR, "There was a problem when attempting to recreate the state file. System call to 'touch' failed:" + touchCommand.str(), "");
 			}
 
@@ -717,7 +717,7 @@ bool Start_Packet_Handler()
 	if(!Config::Inst()->GetReadPcap())
 	{
 		vector<string> ifList = Config::Inst()->GetInterfaces();
-		if (!Config::Inst()->GetIsTraining())
+		if(!Config::Inst()->GetIsTraining())
 		{
 			LoadStateFile();
 		}
@@ -741,30 +741,30 @@ bool Start_Packet_Handler()
 				exit(EXIT_FAILURE);
 			}
 
-			if(pcap_set_promisc(handles[i], 0) != 0)
+			if(pcap_set_promisc(handles[i], 1) != 0)
 			{
 				LOG(ERROR, string("Unable to set interface mode to promisc due to error: ") + pcap_geterr(handles[i]), "");
 			}
 
 			// Set a 20MB buffer
 			// TODO Make this a user configurable option. Too small will cause dropped packets under high load.
-			if (pcap_set_buffer_size(handles[i], 20*1024*1024) != 0)
+			if(pcap_set_buffer_size(handles[i], 1024*1024) != 0)
 			{
 				LOG(ERROR, string("Unable to set pcap capture buffer size due to error: ") + pcap_geterr(handles[i]), "");
 			}
 
 			//Set a capture length of 1Kb. Should be more than enough to get the packet headers
-			if (pcap_set_snaplen(handles[i], 1024) != 0)
+			if(pcap_set_snaplen(handles[i], sizeof(struct ether_header) + sizeof(struct ip) + 4) != 0)
 			{
 				LOG(ERROR, string("Unable to set pcap capture length due to error: ") + pcap_geterr(handles[i]), "");
 			}
 
-			if (pcap_set_timeout(handles[i], 1000) != 0)
+			if(pcap_set_timeout(handles[i], 1000) != 0)
 			{
 				LOG(ERROR, string("Unable to set pcap timeout value due to error: ") + pcap_geterr(handles[i]), "");
 			}
 
-			if (pcap_activate(handles[i]) != 0)
+			if(pcap_activate(handles[i]) != 0)
 			{
 				LOG(CRITICAL, string("Unable to activate packet capture due to error: ") + pcap_geterr(handles[i]), "");
 				exit(EXIT_FAILURE);

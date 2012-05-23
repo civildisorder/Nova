@@ -306,8 +306,12 @@ void *UpdateIPFilter(void *ptr)
 		{
 			int BUF_LEN = (1024 * (sizeof(struct inotify_event)) + 16);
 			char buf[BUF_LEN];
+			char errbuf[PCAP_ERRBUF_SIZE];
 			char filter_exp[64];
 			struct bpf_program *fp = new struct bpf_program();
+
+			bpf_u_int32 maskp; /* subnet mask */
+			bpf_u_int32 netp; /* ip          */
 
 			// Blocking call, only moves on when the kernel notifies it that file has been changed
 			int readLen = read(honeydDHCPNotifyFd, buf, BUF_LEN);
@@ -319,7 +323,16 @@ void *UpdateIPFilter(void *ptr)
 				string haystackAddresses_csv = ConstructFilterString();
 				for(uint i = 0; i < handles.size(); i++)
 				{
-					if(pcap_compile(handles[i], fp, haystackAddresses_csv.data(), 0,PCAP_NETMASK_UNKNOWN) == -1)
+					/* ask pcap for the network address and mask of the device */
+					int ret = pcap_lookupnet(Config::Inst()->GetInterface(i).c_str(), &netp, &maskp, errbuf);
+					if(ret == -1)
+					{
+						LOG(ERROR, "Unable to start packet capture.",
+							"Unable to get the network address and mask: "+string(strerror(errno)));
+						exit(EXIT_FAILURE);
+					}
+
+					if(pcap_compile(handles[i], fp, haystackAddresses_csv.data(), 0, maskp) == -1)
 					{
 						LOG(ERROR, "Unable to enable packet capture.",
 							"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
@@ -359,6 +372,10 @@ void *UpdateWhitelistIPFilter(void *ptr)
 			char buf[BUF_LEN];
 			struct bpf_program fp; /* The compiled filter expression */
 			char filter_exp[64];
+			char errbuf[PCAP_ERRBUF_SIZE];
+
+			bpf_u_int32 maskp; /* subnet mask */
+			bpf_u_int32 netp; /* ip          */
 
 			// Blocking call, only moves on when the kernel notifies it that file has been changed
 			int readLen = read(whitelistNotifyFd, buf, BUF_LEN);
@@ -368,26 +385,38 @@ void *UpdateWhitelistIPFilter(void *ptr)
 						IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
 				whitelistIpAddresses = GetIpAddresses(Config::Inst()->GetPathWhitelistFile());
 				string filterString = ConstructFilterString();
-
-				if(pcap_compile(handle, &fp, filterString.data(), 0,maskp) == -1)
+				for(uint i = 0; i < handles.size(); i++)
 				{
-					LOG(ERROR, "Unable to enable packet capture.",
-						"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handle));
-				}
-				if(pcap_setfilter(handle, &fp) == -1)
-				{
-					LOG(ERROR, "Unable to enable packet capture.",
-						"Couldn't install pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handle));
-				}
 
-				// Clear any suspects that were whitelisted from the GUIs
-				for (uint i = 0; i < whitelistIpAddresses.size(); i++)
-				{
-					suspects.Erase(inet_addr(whitelistIpAddresses.at(i).c_str()));
+					/* ask pcap for the network address and mask of the device */
+					int ret = pcap_lookupnet(Config::Inst()->GetInterface(i).c_str(), &netp, &maskp, errbuf);
+					if(ret == -1)
+					{
+						LOG(ERROR, "Unable to start packet capture.",
+							"Unable to get the network address and mask: "+string(strerror(errno)));
+						exit(EXIT_FAILURE);
+					}
 
-					UpdateMessage *msg = new UpdateMessage(UPDATE_SUSPECT_CLEARED, DIRECTION_TO_UI);
-					msg->m_IPAddress = inet_addr(whitelistIpAddresses.at(i).c_str());
-					NotifyUIs(msg,UPDATE_SUSPECT_CLEARED_ACK, -1);
+					if(pcap_compile(handles[i], &fp, filterString.data(), 0, maskp) == -1)
+					{
+						LOG(ERROR, "Unable to enable packet capture.",
+							"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
+					}
+					if(pcap_setfilter(handles[i], &fp) == -1)
+					{
+						LOG(ERROR, "Unable to enable packet capture.",
+							"Couldn't install pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
+					}
+
+					// Clear any suspects that were whitelisted from the GUIs
+					for (uint i = 0; i < whitelistIpAddresses.size(); i++)
+					{
+						suspects.Erase(inet_addr(whitelistIpAddresses.at(i).c_str()));
+
+						UpdateMessage *msg = new UpdateMessage(UPDATE_SUSPECT_CLEARED, DIRECTION_TO_UI);
+						msg->m_IPAddress = inet_addr(whitelistIpAddresses.at(i).c_str());
+						NotifyUIs(msg,UPDATE_SUSPECT_CLEARED_ACK, -1);
+					}
 				}
 			}
 		}
