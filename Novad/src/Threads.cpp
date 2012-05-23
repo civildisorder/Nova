@@ -64,9 +64,13 @@ extern time_t lastSaveTime;
 extern string dhcpListFile;
 extern vector<string> haystackDhcpAddresses;
 extern vector<pcap_t *> handles;
+extern vector<string> whitelistIpAddresses;
 
-extern int notifyFd;
-extern int watch;
+extern int honeydDHCPNotifyFd;
+extern int honeydDHCPWatch;
+
+extern int whitelistNotifyFd;
+extern int whitelistWatch;
 
 extern ClassificationEngine *engine;
 extern EvidenceTable suspectEvidence;
@@ -252,7 +256,7 @@ void *SilentAlarmLoop(void *ptr)
 		in_addr_t addr = 0;
 		memcpy(&addr, buf, 4);
 		uint64_t key = addr;
-		Suspect * newSuspect = new Suspect();
+		Suspect *newSuspect = new Suspect();
 		if(newSuspect->Deserialize(buf, MAIN_FEATURE_DATA) == 0)
 		{
 			close(connectionSocket);
@@ -298,24 +302,37 @@ void *UpdateIPFilter(void *ptr)
 
 	while (true)
 	{
-		if(watch > 0)
+		if(honeydDHCPWatch > 0)
 		{
 			int BUF_LEN = (1024 * (sizeof(struct inotify_event)) + 16);
 			char buf[BUF_LEN];
+			char errbuf[PCAP_ERRBUF_SIZE];
 			char filter_exp[64];
 			struct bpf_program *fp = new struct bpf_program();
 
+			bpf_u_int32 maskp; /* subnet mask */
+			bpf_u_int32 netp; /* ip          */
+
 			// Blocking call, only moves on when the kernel notifies it that file has been changed
-			int readLen = read(notifyFd, buf, BUF_LEN);
+			int readLen = read(honeydDHCPNotifyFd, buf, BUF_LEN);
 			if(readLen > 0)
 			{
-				watch = inotify_add_watch(notifyFd, dhcpListFile.c_str(),
+				honeydDHCPWatch = inotify_add_watch(honeydDHCPNotifyFd, dhcpListFile.c_str(),
 						IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
-				haystackDhcpAddresses = GetHaystackDhcpAddresses(dhcpListFile);
+				haystackDhcpAddresses = GetIpAddresses(dhcpListFile);
 				string haystackAddresses_csv = ConstructFilterString();
 				for(uint i = 0; i < handles.size(); i++)
 				{
-					if(pcap_compile(handles[i], fp, haystackAddresses_csv.data(), 0,PCAP_NETMASK_UNKNOWN) == -1)
+					/* ask pcap for the network address and mask of the device */
+					int ret = pcap_lookupnet(Config::Inst()->GetInterface(i).c_str(), &netp, &maskp, errbuf);
+					if(ret == -1)
+					{
+						LOG(ERROR, "Unable to start packet capture.",
+							"Unable to get the network address and mask: "+string(strerror(errno)));
+						exit(EXIT_FAILURE);
+					}
+
+					if(pcap_compile(handles[i], fp, haystackAddresses_csv.data(), 0, maskp) == -1)
 					{
 						LOG(ERROR, "Unable to enable packet capture.",
 							"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
@@ -336,7 +353,79 @@ void *UpdateIPFilter(void *ptr)
 			// This is the case when there's no file to watch, just sleep and wait for it to
 			// be created by honeyd when it starts up.
 			sleep(2);
-			watch = inotify_add_watch(notifyFd, dhcpListFile.c_str(),
+			honeydDHCPWatch = inotify_add_watch(honeydDHCPNotifyFd, dhcpListFile.c_str(),
+					IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
+		}
+	}
+	return NULL;
+}
+
+void *UpdateWhitelistIPFilter(void *ptr)
+{
+	MaskKillSignals();
+
+	while (true)
+	{
+		if(whitelistWatch > 0)
+		{
+			int BUF_LEN = (1024 * (sizeof(struct inotify_event)) + 16);
+			char buf[BUF_LEN];
+			struct bpf_program fp; /* The compiled filter expression */
+			char filter_exp[64];
+			char errbuf[PCAP_ERRBUF_SIZE];
+
+			bpf_u_int32 maskp; /* subnet mask */
+			bpf_u_int32 netp; /* ip          */
+
+			// Blocking call, only moves on when the kernel notifies it that file has been changed
+			int readLen = read(whitelistNotifyFd, buf, BUF_LEN);
+			if(readLen > 0)
+			{
+				whitelistWatch = inotify_add_watch(whitelistNotifyFd, Config::Inst()->GetPathWhitelistFile().c_str(),
+						IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
+				whitelistIpAddresses = GetIpAddresses(Config::Inst()->GetPathWhitelistFile());
+				string filterString = ConstructFilterString();
+				for(uint i = 0; i < handles.size(); i++)
+				{
+
+					/* ask pcap for the network address and mask of the device */
+					int ret = pcap_lookupnet(Config::Inst()->GetInterface(i).c_str(), &netp, &maskp, errbuf);
+					if(ret == -1)
+					{
+						LOG(ERROR, "Unable to start packet capture.",
+							"Unable to get the network address and mask: "+string(strerror(errno)));
+						exit(EXIT_FAILURE);
+					}
+
+					if(pcap_compile(handles[i], &fp, filterString.data(), 0, maskp) == -1)
+					{
+						LOG(ERROR, "Unable to enable packet capture.",
+							"Couldn't parse pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
+					}
+					if(pcap_setfilter(handles[i], &fp) == -1)
+					{
+						LOG(ERROR, "Unable to enable packet capture.",
+							"Couldn't install pcap filter: "+ string(filter_exp) + " " + pcap_geterr(handles[i]));
+					}
+
+					// Clear any suspects that were whitelisted from the GUIs
+					for (uint i = 0; i < whitelistIpAddresses.size(); i++)
+					{
+						suspects.Erase(inet_addr(whitelistIpAddresses.at(i).c_str()));
+
+						UpdateMessage *msg = new UpdateMessage(UPDATE_SUSPECT_CLEARED, DIRECTION_TO_UI);
+						msg->m_IPAddress = inet_addr(whitelistIpAddresses.at(i).c_str());
+						NotifyUIs(msg,UPDATE_SUSPECT_CLEARED_ACK, -1);
+					}
+				}
+			}
+		}
+		else
+		{
+			// This is the case when there's no file to watch, just sleep and wait for it to
+			// be created by honeyd when it starts up.
+			sleep(3);
+			whitelistWatch = inotify_add_watch(whitelistNotifyFd, Config::Inst()->GetPathWhitelistFile().c_str(),
 					IN_CLOSE_WRITE | IN_MOVED_TO | IN_MODIFY | IN_DELETE);
 		}
 	}

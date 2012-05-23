@@ -68,6 +68,7 @@ public:
     std::string GetPathPcapFile();
     std::string GetPathTrainingCapFolder();
     std::string GetPathTrainingFile();
+    std::string GetPathWhitelistFile();
     std::string GetKey();
     std::vector<in_addr_t> GetNeighbors();
 
@@ -85,7 +86,7 @@ public:
     int GetSaveFreq();
     int GetTcpCheckFreq();
     int GetTcpTimout();
-    int GetThinningDistance();
+    double GetThinningDistance();
 
     double GetClassificationThreshold();
     double GetSaSleepDuration();
@@ -115,6 +116,7 @@ public:
     void SetPathPcapFile(std::string pathPcapFile);
     void SetPathTrainingCapFolder(std::string pathTrainingCapFolder);
     void SetPathTrainingFile(std::string pathTrainingFile);
+    void SetPathWhitelistFile(std::string pathWhitelistFile);
     void SetReadPcap(bool readPcap);
     void SetSaMaxAttempts(int saMaxAttempts);
     void SetSaPort(int saPort);
@@ -122,7 +124,7 @@ public:
     void SetSaveFreq(int saveFreq);
     void SetTcpCheckFreq(int tcpCheckFreq);
     void SetTcpTimout(int tcpTimout);
-    void SetThinningDistance(int thinningDistance);
+    void SetThinningDistance(double thinningDistance);
     void SetUseTerminals(bool useTerminals);
     void SetKey(std::string key);
     void SetNeigbors(std::vector<in_addr_t> neighbors);
@@ -185,6 +187,7 @@ private:
 	std::string m_pathConfigHoneydUser;
 	std::string m_pathPcapFile;
 	std::string m_pathTrainingFile;
+	std::string m_pathWhitelistFile;
 	std::string m_pathTrainingCapFolder;
 	std::string m_pathCESaveFile;
 
@@ -195,7 +198,7 @@ private:
 	int m_classificationTimeout;
 	int m_saPort;
 	int m_k;
-	int m_thinningDistance;
+	double m_thinningDistance;
 	int m_saveFreq;
 	int m_dataTTL;
 	int m_saMaxAttempts;

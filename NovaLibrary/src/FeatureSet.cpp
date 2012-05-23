@@ -15,7 +15,7 @@
 //   along with Nova.  If not, see <http://www.gnu.org/licenses/>.
 // Description : Maintains and calculates distinct features for individual Suspects
 //					for use in classification of the Suspect.
-//============================================================================/*
+//============================================================================
 
 #include "FeatureSet.h"
 #include "Logger.h"
@@ -144,21 +144,25 @@ void FeatureSet::Calculate(const uint32_t& featureDimension)
 		case PORT_TRAFFIC_DISTRIBUTION:
 		{
 			m_features[PORT_TRAFFIC_DISTRIBUTION] = 0;
-			double portMax = 0;
-			for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
-			{
-				if(it->second > portMax)
-				{
-					portMax = it->second;
-				}
-			}
-			for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
-			{
-				m_features[PORT_TRAFFIC_DISTRIBUTION] += ((double)it->second / portMax);
-			}
 			if(m_portTable.size())
 			{
-				m_features[PORT_TRAFFIC_DISTRIBUTION] = m_features[PORT_TRAFFIC_DISTRIBUTION] / (double)m_portTable.size();
+				double portDivisor = 0;
+				for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
+				{
+					//get the maximum port entry for normalization
+					if(it->second > portDivisor)
+					{
+						portDivisor = it->second;
+					}
+				}
+				//Multiply the maximum entry with the size to get the divisor
+				portDivisor = portDivisor * ((double)m_portTable.size());
+				long long unsigned int temp = 0;
+				for(Port_Table::iterator it = m_portTable.begin() ; it != m_portTable.end(); it++)
+				{
+					temp += it->second;
+				}
+				m_features[PORT_TRAFFIC_DISTRIBUTION] = ((double)temp)/portDivisor;
 			}
 			break;
 		}
@@ -194,7 +198,7 @@ void FeatureSet::Calculate(const uint32_t& featureDimension)
 			for(Packet_Table::iterator it = m_packTable.begin() ; it != m_packTable.end(); it++)
 			{
 				// number of packets multiplied by (packet_size - mean)^2 divided by count
-				variance += (it->second * pow((it->first - mean), 2))/ count;
+				variance += (it->second *pow((it->first - mean), 2))/ count;
 			}
 
 			m_features[PACKET_SIZE_DEVIATION] = sqrt(variance);
@@ -283,7 +287,7 @@ void FeatureSet::UpdateEvidence(Evidence *evidence)
 		//If untracked IP protocol or error case ignore it
 		default:
 		{
-			LOG(DEBUG, "Dropping packet with unhandled IP protocol." , "");
+			//LOG(DEBUG, "Dropping packet with unhandled IP protocol." , "");
 			return;
 		}
 	}
@@ -393,7 +397,7 @@ FeatureSet& FeatureSet::operator-=(FeatureSet &rhs)
 	return *this;
 }
 
-uint32_t FeatureSet::SerializeFeatureSet(u_char * buf)
+uint32_t FeatureSet::SerializeFeatureSet(u_char *buf)
 {
 	uint32_t offset = 0;
 
@@ -411,7 +415,7 @@ uint32_t FeatureSet::SerializeFeatureSet(u_char * buf)
 }
 
 
-uint32_t FeatureSet::DeserializeFeatureSet(u_char * buf)
+uint32_t FeatureSet::DeserializeFeatureSet(u_char *buf)
 {
 	uint32_t offset = 0;
 

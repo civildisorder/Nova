@@ -45,6 +45,7 @@ public:
 
 	// Exception enabled access method
 	ValueType& operator[](KeyType key);
+	ValueType& get(KeyType key);
 
 	void set_deleted_key(KeyType key);
 	void set_empty_key(KeyType key);
@@ -146,7 +147,22 @@ void HashMap<KeyType,ValueType,HashFcn,EqualKey>::resize(size_t size)
 template<class KeyType, class ValueType, class HashFcn, class EqualKey>
 void HashMap<KeyType,ValueType,HashFcn,EqualKey>::erase(KeyType key)
 {
-	m_map.erase(key);
+	if (!m_isEmptyKeyUsed)
+	{
+		throw emptyKeyNotSetException();
+	}
+	else if (m_isEmptyKeyUsed && m_equalityChecker.operator()(key, m_emptyKey))
+	{
+		throw emptyKeyException();
+	}
+	else if (!m_isDeletedKeyUsed || m_equalityChecker.operator()(key, m_deletedKey))
+	{
+		throw deleteKeyException();
+	}
+	else
+	{
+		m_map.erase(key);
+	}
 }
 
 template<class KeyType, class ValueType, class HashFcn, class EqualKey>
@@ -192,6 +208,12 @@ ValueType& HashMap<KeyType,ValueType,HashFcn,EqualKey>::operator[](KeyType key)
 	{
 		return m_map[key];
 	}
+}
+
+template<class KeyType, class ValueType, class HashFcn, class EqualKey>
+ValueType& HashMap<KeyType,ValueType,HashFcn,EqualKey>::get(KeyType key)
+{
+	return m_map[key];
 }
 
 }

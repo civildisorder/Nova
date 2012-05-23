@@ -178,7 +178,7 @@ NovaGUI::~NovaGUI()
 }
 
 //Draws the suspect context menu
-void NovaGUI::contextMenuEvent(QContextMenuEvent * event)
+void NovaGUI::contextMenuEvent(QContextMenuEvent *event)
 {
 	if(ui.suspectList->hasFocus() || ui.suspectList->underMouse())
 	{
@@ -478,9 +478,9 @@ void NovaGUI::DrawAllSuspects()
 	m_editingSuspectList = true;
 	ClearSuspectList();
 
-	QListWidgetItem * item = NULL;
-	QListWidgetItem * mainItem = NULL;
-	Suspect * suspect = NULL;
+	QListWidgetItem *item = NULL;
+	QListWidgetItem *mainItem = NULL;
+	Suspect *suspect = NULL;
 	QString str;
 	QBrush brush;
 	QColor color;
@@ -575,7 +575,7 @@ void NovaGUI::DrawSuspect(in_addr_t suspectAddr)
 	in_addr_t addr;
 
 	Lock lock(&suspectTableLock);
-	suspectItem * sItem = &SuspectTable[suspectAddr];
+	suspectItem *sItem = &SuspectTable[suspectAddr];
 	//Extract Information
 	str = (QString) string(inet_ntoa(sItem->suspect->GetInAddr())).c_str();
 
@@ -874,7 +874,7 @@ void NovaGUI::on_actionClear_All_Suspects_triggered()
 
 void NovaGUI::on_actionClear_Suspect_triggered()
 {
-	QListWidget * list = NULL;
+	QListWidget *list = NULL;
 	if(ui.suspectList->hasFocus())
 	{
 		list = ui.suspectList;
@@ -898,7 +898,7 @@ void NovaGUI::on_actionClear_Suspect_triggered()
 
 void NovaGUI::on_actionHide_Suspect_triggered()
 {
-	QListWidget * list = NULL;
+	QListWidget *list = NULL;
 	if(ui.suspectList->hasFocus())
 	{
 		list = ui.suspectList;
@@ -1211,7 +1211,7 @@ void NovaGUI::on_clearSuspectsButton_clicked()
 /************************************************
  * List Signal Handlers
  ************************************************/
-void NovaGUI::on_suspectList_currentItemChanged(QListWidgetItem * current, QListWidgetItem * previous)
+void NovaGUI::on_suspectList_currentItemChanged(QListWidgetItem *current, QListWidgetItem *previous)
 {
 	if(!m_editingSuspectList)
 	{
@@ -1431,7 +1431,14 @@ void *CallbackLoop(void *ptr)
 				((NovaGUI*)ptr)->HideSuspect(change.m_suspectIP);
 				{
 					Lock lock(&suspectTableLock);
-					SuspectTable.erase(change.m_suspectIP);
+					try
+					{
+						SuspectTable.erase(change.m_suspectIP);
+					}
+					catch (Nova::hashMapException &s)
+					{
+						LOG(ERROR, "Error clearing suspect as commanded from GUI: " + string(s.what()), "");
+					}
 				}
 				break;
 			}

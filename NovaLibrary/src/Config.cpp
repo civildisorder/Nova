@@ -68,7 +68,8 @@ string Config::m_prefixes[] =
 	"SMTP_DOMAIN",
 	"RECIPIENTS",
 	"SERVICE_PREFERENCES",
-	"HAYSTACK_STORAGE"
+	"HAYSTACK_STORAGE",
+	"WHITELIST_FILE"
 };
 
 // Files we need to run (that will be loaded with defaults if deleted)
@@ -76,7 +77,6 @@ string Config::m_requiredFiles[] =
 {
 	"/settings",
 	"/Config",
-	"/Data",
 	"/keys",
 	"/templates",
 	"/Config/NOVAConfig.txt",
@@ -680,6 +680,22 @@ void Config::LoadConfig_Internal()
 				}
 				continue;
 			}
+
+
+			// WHITELIST_FILE
+			prefixIndex++;
+			prefix = m_prefixes[prefixIndex];
+			if(!line.substr(0, prefix.size()).compare(prefix))
+			{
+				line = line.substr(prefix.size() + 1, line.size());
+				if(line.size() > 0 && !line.substr(line.size() - 4,
+						line.size()).compare(".txt"))
+				{
+					m_pathWhitelistFile = line;
+					isValid[prefixIndex] = true;
+				}
+				continue;
+			}
 		}
 	}
 	else
@@ -1253,7 +1269,8 @@ void Config::SetDefaults()
 	m_interfaces.push_back("default");
 	m_pathConfigHoneydHs 	= "Config/haystack.config";
 	m_pathPcapFile 		= "../pcapfile";
-	m_pathTrainingFile 	= "Data/data.txt";
+	m_pathTrainingFile 	= "Config/data.txt";
+	m_pathWhitelistFile = "Config/whitelist.txt";
 	m_pathConfigHoneydUser	= "Config/doppelganger.config";
 	m_pathTrainingCapFolder = "Data";
 	m_pathCESaveFile = "ceStateSave";
@@ -1633,6 +1650,12 @@ string Config::GetPathTrainingFile()
 	return m_pathTrainingFile;
 }
 
+string Config::GetPathWhitelistFile()
+{
+	Lock lock(&m_lock, true);
+	return m_pathWhitelistFile;
+}
+
 bool Config::GetReadPcap()
 {
 	Lock lock(&m_lock, true);
@@ -1675,7 +1698,7 @@ int Config::GetTcpTimout()
 	return m_tcpTimout;
 }
 
-int Config::GetThinningDistance()
+double Config::GetThinningDistance()
 {
 	Lock lock(&m_lock, true);
 	return m_thinningDistance;
@@ -1861,6 +1884,13 @@ void Config::SetPathTrainingFile(string pathTrainingFile)
 	m_pathTrainingFile = pathTrainingFile;
 }
 
+void Config::SetPathWhitelistFile(string pathWhitelistFile)
+{
+	Lock lock(&m_lock, false);
+	m_pathWhitelistFile = pathWhitelistFile;
+}
+
+
 void Config::SetReadPcap(bool readPcap)
 {
 	Lock lock(&m_lock, false);
@@ -1903,7 +1933,7 @@ void Config::SetTcpTimout(int tcpTimout)
 	m_tcpTimout = tcpTimout;
 }
 
-void Config::SetThinningDistance(int thinningDistance)
+void Config::SetThinningDistance(double thinningDistance)
 {
 	Lock lock(&m_lock, false);
 	m_thinningDistance = thinningDistance;

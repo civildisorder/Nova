@@ -87,6 +87,8 @@ bool SuspectTable::AddNewSuspect(Suspect *suspect)
 {
 	//Write lock the table and check key validity
 	Lock lock(&m_lock, false);
+	Suspect *suspectCopy = new Suspect(*suspect);
+	in_addr_t key = suspectCopy->GetIpAddress();
 	//If we return false then there is no suspect at this ip address yet
 	if((suspect != NULL) && (!IsValidKey_NonBlocking(suspect->GetIpAddress())))
 	{
@@ -115,6 +117,47 @@ bool SuspectTable::AddNewSuspect(Suspect *suspect)
 		}
 		//Allocate the Suspect and copy the contents
 		m_suspectTable[key] = suspectCopy;
+		//Store the key
+		m_keys.push_back(key);
+		return true;
+	}
+	//Else this suspect already exists, we cannot add it again->
+	return false;
+}
+
+// Adds the Suspect pointed to in 'suspect' into the table using the source of the packet as the key;
+// 		packet: copy of the packet you whish to create a suspect from
+// Returns true on Success, and false if the suspect already exists
+bool SuspectTable::AddNewSuspect(const Evidence& evidence)
+{
+	Lock lock(&m_lock, false);
+	Suspect *suspect = new Suspect(evidence);
+	in_addr_t key = suspect->GetIpAddress();
+	//If we return false then there is no suspect at this ip address yet
+	if(!IsValidKey_NonBlocking(key))
+	{
+		//If there is already a SuspectLock this Suspect is listed for deletion but it's lock still exists
+		if(m_lockTable.keyExists(key))
+		{
+			//Wait for the suspect lock, this call releases the table while blocking.
+			LockSuspect(key);
+			//Reverse the deletion flag
+			m_lockTable[key].deleted = false;
+			UnlockSuspect(key);
+		}
+		//Else we need to init a SuspectLock
+		{
+			pthread_mutexattr_t tempAttr;
+			pthread_mutexattr_init(&tempAttr);
+			pthread_mutexattr_settype(&tempAttr, PTHREAD_MUTEX_ERRORCHECK);
+			//Destroy before init just to be safe
+			pthread_mutex_destroy(&m_lockTable[key].lock);
+			pthread_mutex_init(&m_lockTable[key].lock, &tempAttr);
+			m_lockTable[key].deleted = false;
+			m_lockTable[key].ref_cnt = 0;
+		}
+		//Allocate the Suspect and copy the contents
+		m_suspectTable[key] = suspect;
 		//Store the key
 		m_keys.push_back(key);
 		return true;
@@ -171,7 +214,7 @@ void SuspectTable::UpdateAllSuspects()
 // Returns (0) on Success, (-1) if the Suspect isn't Checked Out by this thread
 // and (-2) if the Suspect does not exist (Key invalid or suspect was deleted)
 // Note:  This function blocks until it can acquire a write lock on the suspect
-SuspectTableRet SuspectTable::CheckIn(Suspect * suspect)
+SuspectTableRet SuspectTable::CheckIn(Suspect *suspect)
 {
 	Lock lock(&m_lock, false);
 	in_addr_t key = suspect->GetIpAddress();
@@ -512,7 +555,7 @@ uint32_t SuspectTable::DumpContents(ofstream *out, time_t saveTime)
 	{
 		if(IsValidKey_NonBlocking(m_keys[i]))
 		{
-			Suspect * suspect = m_suspectTable[m_keys[i]];
+			Suspect *suspect = m_suspectTable[m_keys[i]];
 			if(!suspect->GetFeatureSet(MAIN_FEATURES).m_packetCount
 				&& !suspect->GetFeatureSet(UNSENT_FEATURES).m_packetCount)
 			{
@@ -531,7 +574,7 @@ uint32_t SuspectTable::DumpContents(ofstream *out, time_t saveTime)
 		{
 			if(IsValidKey_NonBlocking(m_keys[i]))
 			{
-				Suspect * suspect = m_suspectTable[m_keys[i]];
+				Suspect *suspect = m_suspectTable[m_keys[i]];
 				if(!suspect->GetFeatureSet(MAIN_FEATURES).m_packetCount
 					&& !suspect->GetFeatureSet(UNSENT_FEATURES).m_packetCount)
 				{
@@ -592,8 +635,9 @@ uint32_t SuspectTable::ReadContents(ifstream *in, time_t expirationTime)
 			return (sizeof(expirationTime) + sizeof(dataSize) + dataSize);
 		}
 
-		u_char tableBuffer[dataSize];
-		in->read((char*) tableBuffer, dataSize);
+		u_char *tableBuffer = new u_char[dataSize];
+
+		in->read((char*)tableBuffer, dataSize);
 		lengthLeft -= dataSize;
 
 		// Read each suspect
@@ -606,6 +650,7 @@ uint32_t SuspectTable::ReadContents(ifstream *in, time_t expirationTime)
 				offset += newSuspect->Deserialize(tableBuffer+ offset, ALL_FEATURE_DATA);
 			} catch (Nova::hashMapException& e) {
 				LOG(ERROR, "The state file may be corrupt, a hash table invalid key exception was caught during deserialization", "");
+				delete tableBuffer;
 				return 0;
 			}
 
@@ -666,6 +711,8 @@ uint32_t SuspectTable::ReadContents(ifstream *in, time_t expirationTime)
 				}
 			}
 		}
+
+		delete[] tableBuffer;
 	}
 	ret = (uint32_t)in->tellg() - cur;
 	return ret;
@@ -682,7 +729,7 @@ bool SuspectTable::IsValidKey(const in_addr_t& key)
 	return IsValidKey_NonBlocking(key);
 }
 
-bool SuspectTable::IsEmptySuspect(Suspect * suspect)
+bool SuspectTable::IsEmptySuspect(Suspect *suspect)
 {
 	return (suspect->GetClassification() == EMPTY_SUSPECT_CLASSIFICATION);
 }

@@ -64,6 +64,10 @@ Suspect::Suspect(Evidence *evidence)
 	}
 }
 
+string Suspect::GetIpString()
+{
+	return string(inet_ntoa(m_IpAddress));
+}
 
 string Suspect::ToString()
 {
@@ -158,7 +162,7 @@ void Suspect::CalculateFeatures()
 // Stores the Suspect information into the buffer, retrieved using deserializeSuspect
 //		buf - Pointer to buffer where serialized data will be stored
 // Returns: number of bytes set in the buffer
-uint32_t Suspect::Serialize(u_char * buf, SerializeFeatureMode whichFeatures)
+uint32_t Suspect::Serialize(u_char *buf, SerializeFeatureMode whichFeatures)
 {
 	uint32_t offset = 0;
 
@@ -277,7 +281,7 @@ uint32_t Suspect::GetSerializeLength(SerializeFeatureMode whichFeatures)
 // Reads Suspect information from a buffer originally populated by serializeSuspect
 //		buf - Pointer to buffer where the serialized suspect is
 // Returns: number of bytes read from the buffer
-uint32_t Suspect::Deserialize(u_char * buf, SerializeFeatureMode whichFeatures)
+uint32_t Suspect::Deserialize(u_char *buf, SerializeFeatureMode whichFeatures)
 {
 	uint32_t offset = 0;
 
