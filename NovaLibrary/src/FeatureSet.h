@@ -119,7 +119,7 @@ public:
 
 	// Processes incoming evidence before calculating the features
 	//		packet - packet headers of new packet
-	void UpdateEvidence(const Evidence& packet);
+	void UpdateEvidence(Evidence *evidence);
 
 	// Serializes the contents of the global 'features' array
 	//		buf - Pointer to buffer where serialized feature set is to be stored

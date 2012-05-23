@@ -50,13 +50,13 @@ Suspect::~Suspect()
 }
 
 
-Suspect::Suspect(const Evidence& packet)
+Suspect::Suspect(Evidence *evidence)
 {
-	m_IpAddress.s_addr = packet.m_evidencePacket.ip_src;
+	m_IpAddress.s_addr = evidence->m_evidencePacket.ip_src;
 	m_hostileNeighbors = 0;
 	m_classification = -1;
 	m_isHostile = false;
-	AddEvidence(packet);
+	ConsumeEvidence(evidence);
 	m_flaggedByAlarm = false;
 	for(int i = 0; i < DIM; i++)
 	{
@@ -133,9 +133,16 @@ string Suspect::ToString()
 	return ss.str();
 }
 
-void Suspect::AddEvidence(const Evidence& evidence)
+void Suspect::ConsumeEvidence(Evidence *evidence)
 {
-	m_unsentFeatures.UpdateEvidence(evidence);
+	Evidence *curEvidence = evidence, *tempEv = NULL;
+	while(curEvidence != NULL)
+	{
+		m_unsentFeatures.UpdateEvidence(curEvidence);
+		tempEv = curEvidence;
+		curEvidence = tempEv->m_next;
+		delete tempEv;
+	}
 	m_needsClassificationUpdate = true;
 	m_isLive = (Config::Inst()->GetReadPcap());
 }

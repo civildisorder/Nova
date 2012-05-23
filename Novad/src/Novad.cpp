@@ -648,7 +648,7 @@ bool Start_Packet_Handler()
 
 	string haystackAddresses_csv = "";
 
-	struct bpf_program *fp = NULL;			/* The compiled filter expression */
+	struct bpf_program fp;			/* The compiled filter expression */
 	char filter_exp[64];
 	bpf_u_int32 maskp; /* subnet mask */
 	bpf_u_int32 netp; /* ip          */
@@ -669,20 +669,20 @@ bool Start_Packet_Handler()
 				"Couldn't open pcap file: "+Config::Inst()->GetPathPcapFile()+": "+string(errbuf)+".");
 			exit(EXIT_FAILURE);
 		}
-		if(pcap_compile(handles[0], fp, haystackAddresses_csv.data(), 0, PCAP_NETMASK_UNKNOWN) == -1)
+		if(pcap_compile(handles[0], &fp, haystackAddresses_csv.data(), 0, PCAP_NETMASK_UNKNOWN) == -1)
 		{
 			LOG(CRITICAL, "Unable to start packet capture.",
 				"Couldn't parse filter: "+string(filter_exp)+ " " + pcap_geterr(handles[0]) +".");
 			exit(EXIT_FAILURE);
 		}
 
-		if(pcap_setfilter(handles[0], fp) == -1)
+		if(pcap_setfilter(handles[0], &fp) == -1)
 		{
 			LOG(CRITICAL, "Unable to start packet capture.",
 				"Couldn't install filter: "+string(filter_exp)+ " " + pcap_geterr(handles[0]) +".");
 			exit(EXIT_FAILURE);
 		}
-		pcap_freecode(fp);
+		pcap_freecode(&fp);
 		//First process any packets in the file then close all the sessions
 		pcap_dispatch(handles[0], -1, Packet_Handler,NULL);
 
@@ -711,7 +711,7 @@ bool Start_Packet_Handler()
 			string temp = haystackAddresses_csv;
 			temp.append(" || ");
 			temp.append(ipAddr);
-			handles[i] = pcap_create(ifList[i].c_str(), errbuf);
+			handles.push_back(pcap_create(ifList[i].c_str(), errbuf));
 
 			if(handles[i] == NULL)
 			{
@@ -758,20 +758,20 @@ bool Start_Packet_Handler()
 				exit(EXIT_FAILURE);
 			}
 
-			if(pcap_compile(handles[i], fp, haystackAddresses_csv.data(), 0, maskp) == -1)
+			if(pcap_compile(handles[i], &fp, haystackAddresses_csv.data(), 0, maskp) == -1)
 			{
 				LOG(ERROR, "Unable to start packet capture.",
 					"Couldn't parse filter: "+string(filter_exp)+ " " + pcap_geterr(handles[i]) +".");
 				exit(EXIT_FAILURE);
 			}
 
-			if(pcap_setfilter(handles[i], fp) == -1)
+			if(pcap_setfilter(handles[i], &fp) == -1)
 			{
 				LOG(ERROR, "Unable to start packet capture.",
 					"Couldn't install filter: "+string(filter_exp)+ " " + pcap_geterr(handles[i]) +".");
 				exit(EXIT_FAILURE);
 			}
-			pcap_freecode(fp);
+			pcap_freecode(&fp);
 		}
 		for(u_char i = 1; i < handles.size(); i++)
 		{
@@ -786,7 +786,10 @@ bool Start_Packet_Handler()
 		}
 		//"Main Loop"
 		//Runs the function "Packet_Handler" every time a packet is received
-		pcap_loop(handles[0], -1, Packet_Handler, NULL);
+		u_char index = 0;
+		pthread_t consumer;
+		pthread_create(&consumer, NULL, ConsumerLoop, NULL);
+		pcap_loop(handles[0], -1, Packet_Handler, &index);
 	}
 	return false;
 }
@@ -978,12 +981,6 @@ vector <string> GetHaystackAddresses(string honeyDConfigPath)
 	}
 	return retAddresses;
 }
-
-void UpdateSuspect(const Evidence& packet)
-{
-
-}
-
 
 void UpdateAndStore(const in_addr_t& key)
 {

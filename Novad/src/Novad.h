@@ -94,10 +94,6 @@ std::string ConstructFilterString();
 //		packet - packet data
 void Packet_Handler(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char* packet);
 
-// Updates a suspect with evidence to be processed later
-//		packet : Packet headers to used for the evidence
-void UpdateSuspect(const Evidence& packet);
-
 // Masks the kill signals of a thread so they will get
 // sent to the main thread's signal handler.
 void MaskKillSignals();

@@ -44,11 +44,11 @@ class Evidence
 public:
 
 	_evidencePacket m_evidencePacket;
-	volatile Evidence * m_next;
+	Evidence *m_next;
 
-	Evidence(const u_char * const& packet_at_ip_header, const pcap_pkthdr * const& pkthdr);
+	Evidence(const u_char *packet_at_ip_header, const pcap_pkthdr *pkthdr);
 
-	Evidence(const _evidencePacket& packet);
+	Evidence(Evidence *evidence);
 
 	Evidence();
 

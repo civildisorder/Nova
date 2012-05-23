@@ -364,17 +364,7 @@ void *ConsumerLoop(void *ptr)
 	{
 		//Blocks on a mutex/condition if there's no evidence to process
 		Evidence * cur = suspectEvidence.GetEvidence();
-		Evidence * temp = NULL;
-
-		Suspect curSuspect = suspects.CheckOut(cur->m_evidencePacket.ip_src);
-		while(cur != NULL)
-		{
-			curSuspect.AddEvidence(*cur);
-			temp = cur;
-			cur = (Evidence *)temp->m_next;
-			delete temp;
-		}
-		suspects.CheckIn(&curSuspect);
+		suspects.ProcessEvidence(cur);
 	}
 	return NULL;
 }

@@ -32,8 +32,6 @@ public:
 
 	EvidenceQueue();
 
-	~EvidenceQueue();
-
 	Evidence * Pop();
 
 	//Returns true if this is the first piece of Evidence
@@ -43,9 +41,8 @@ public:
 
 private:
 
-	pthread_mutex_t m_lock;
-	volatile Evidence * m_first;
-	volatile Evidence * m_last;
+	Evidence * m_first;
+	Evidence * m_last;
 };
 
 }

@@ -253,22 +253,26 @@ void FeatureSet::CalculateTimeInterval()
 	}
 }
 
-void FeatureSet::UpdateEvidence(const Evidence& packet)
+void FeatureSet::UpdateEvidence(Evidence *evidence)
 {
 	// Ensure our assumptions about valid packet fields are true
-	if(packet.m_evidencePacket.ip_dst == 0)
+	if(evidence->m_evidencePacket.ip_dst == 0)
 	{
 		LOG(DEBUG, "Got packet with invalid source IP address of 0. Skipping.", "");
 		return;
 	}
-	switch(packet.m_evidencePacket.ip_p)
+	switch(evidence->m_evidencePacket.ip_p)
 	{
 		//If UDP
 		case 17:
+		{
+			m_portTable[evidence->m_evidencePacket.dst_port];
+			break;
+		}
 		//If TCP
 		case 6:
 		{
-			m_portTable[packet.m_evidencePacket.dst_port];
+			m_portTable[evidence->m_evidencePacket.dst_port];
 			break;
 		}
 		//If ICMP
@@ -285,25 +289,25 @@ void FeatureSet::UpdateEvidence(const Evidence& packet)
 	}
 
 	m_packetCount++;
-	m_bytesTotal += packet.m_evidencePacket.ip_len;
-	m_IPTable[packet.m_evidencePacket.ip_dst]++;
-	m_packTable[packet.m_evidencePacket.ip_len]++;
+	m_bytesTotal += evidence->m_evidencePacket.ip_len;
+	m_IPTable[evidence->m_evidencePacket.ip_dst]++;
+	m_packTable[evidence->m_evidencePacket.ip_len]++;
 
 	if(m_lastTime != 0)
 	{
-		m_intervalTable[packet.m_evidencePacket.ts - m_lastTime]++;
+		m_intervalTable[evidence->m_evidencePacket.ts - m_lastTime]++;
 	}
 
-	m_lastTime = packet.m_evidencePacket.ts;
+	m_lastTime = evidence->m_evidencePacket.ts;
 
 	//Accumulate to find the lowest Start time and biggest end time.
-	if(packet.m_evidencePacket.ts < m_startTime)
+	if(evidence->m_evidencePacket.ts < m_startTime)
 	{
-		m_startTime = packet.m_evidencePacket.ts;
+		m_startTime = evidence->m_evidencePacket.ts;
 	}
-	if(packet.m_evidencePacket.ts > m_endTime)
+	if(evidence->m_evidencePacket.ts > m_endTime)
 	{
-		m_endTime =  packet.m_evidencePacket.ts;
+		m_endTime =  evidence->m_evidencePacket.ts;
 		CalculateTimeInterval();
 	}
 }

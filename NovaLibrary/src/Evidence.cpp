@@ -36,37 +36,38 @@ Evidence::Evidence()
 	m_evidencePacket.ts = 0;
 }
 
-Evidence::Evidence(const u_char * const& packet_at_ip_header, const pcap_pkthdr * const& pkthdr)
+Evidence::Evidence(const u_char *packet_at_ip_header, const pcap_pkthdr *pkthdr)
 {
 	//Get timestamp
 	m_evidencePacket.ts = pkthdr->ts.tv_sec;
 
 	//Copy out vals from header
-	const u_char* offset = packet_at_ip_header + 9; // @9 - read 2
-	m_evidencePacket.ip_len = ntohs((uint16_t)*packet_at_ip_header);
+	u_char* offset = (u_char *)(packet_at_ip_header + 2); // @2 - read 2
+	m_evidencePacket.ip_len = ntohs(*(uint16_t *)offset);
 	offset += 7; // @16 - read 1
-	m_evidencePacket.ip_p = (uint8_t)*packet_at_ip_header;
+	m_evidencePacket.ip_p = *(uint8_t *)offset;
 	offset += 3; // @19 - read 4
-	m_evidencePacket.ip_src = ntohl((uint32_t)*packet_at_ip_header);
+	m_evidencePacket.ip_src = ntohl(*(uint32_t *)offset);
 	offset += 4; // @23 - read 4
-	m_evidencePacket.ip_dst = ntohl((uint32_t)*packet_at_ip_header);
+	m_evidencePacket.ip_dst = ntohl(*(uint32_t *)offset);
 	offset += 7; // @30 - read 2 //Same for udp or tcp
 
 	//If TCP or UDP
 	if((m_evidencePacket.ip_p == 6) || (m_evidencePacket.ip_p == 17))
 	{
-		m_evidencePacket.dst_port = ntohs((uint16_t)*packet_at_ip_header);
+		m_evidencePacket.dst_port = ntohs(*(uint16_t *)offset);
 	}
 	//Any other protocol
 	else
 	{
 		m_evidencePacket.dst_port = 0;
 	}
+	m_next = NULL;
 }
 
-Evidence::Evidence(const _evidencePacket& packet)
+Evidence::Evidence(Evidence * evidence)
 {
-	m_evidencePacket = packet;
+	m_evidencePacket = evidence->m_evidencePacket;
 	m_next = NULL;
 }
 
