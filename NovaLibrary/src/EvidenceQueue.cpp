@@ -18,7 +18,6 @@
 //============================================================================/*
 
 #include "EvidenceQueue.h"
-#include <pthread.h>
 
 using namespace std;
 

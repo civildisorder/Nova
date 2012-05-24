@@ -754,7 +754,8 @@ bool Start_Packet_Handler()
 			}
 
 			//Set a capture length of 1Kb. Should be more than enough to get the packet headers
-			if(pcap_set_snaplen(handles[i], sizeof(struct ether_header) + sizeof(struct ip) + 4) != 0)
+			// 88 == Ethernet header (14 bytes) + max IP header size (60 bytes)  + 4 bytes to extract the destination port for udp and tcp packets
+			if(pcap_set_snaplen(handles[i], 88) != 0)
 			{
 				LOG(ERROR, string("Unable to set pcap capture length due to error: ") + pcap_geterr(handles[i]), "");
 			}

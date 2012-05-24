@@ -32,7 +32,7 @@ Evidence::Evidence()
 	m_evidencePacket.ip_dst = 0;
 	m_evidencePacket.ip_len = 0;
 	m_evidencePacket.ip_p = 0;
-	m_evidencePacket.ip_src = 0;
+	m_evidencePacket.ip_src = ~0;
 	m_evidencePacket.ts = 0;
 }
 
@@ -42,7 +42,14 @@ Evidence::Evidence(const u_char *packet_at_ip_header, const pcap_pkthdr *pkthdr)
 	m_evidencePacket.ts = pkthdr->ts.tv_sec;
 
 	//Copy out vals from header
-	u_char* offset = (u_char *)(packet_at_ip_header + 2); // @2 - read 2
+	const u_char * offset = packet_at_ip_header; // @2 - read 2
+
+	// 00001111 mask to get the ip header length
+	uint8_t ip_hl = 15;
+	ip_hl &= *(uint8_t *)offset;
+	m_next = NULL;
+
+	offset += 2;
 	m_evidencePacket.ip_len = ntohs(*(uint16_t *)offset);
 	offset += 7; // @16 - read 1
 	m_evidencePacket.ip_p = *(uint8_t *)offset;
@@ -50,19 +57,18 @@ Evidence::Evidence(const u_char *packet_at_ip_header, const pcap_pkthdr *pkthdr)
 	m_evidencePacket.ip_src = ntohl(*(uint32_t *)offset);
 	offset += 4; // @23 - read 4
 	m_evidencePacket.ip_dst = ntohl(*(uint32_t *)offset);
-	offset += 7; // @30 - read 2 //Same for udp or tcp
+
+	//Initialize port to 0 in case we don't have a TCP or UDP packet
+	m_evidencePacket.dst_port = 0;
 
 	//If TCP or UDP
 	if((m_evidencePacket.ip_p == 6) || (m_evidencePacket.ip_p == 17))
 	{
+		//Point to the beginning of the tcp or udp header + 2 to get the destination port, same offset after ip header for both
+		offset = packet_at_ip_header + ip_hl + 2;
+		//read in the dest port
 		m_evidencePacket.dst_port = ntohs(*(uint16_t *)offset);
 	}
-	//Any other protocol
-	else
-	{
-		m_evidencePacket.dst_port = 0;
-	}
-	m_next = NULL;
 }
 
 Evidence::Evidence(Evidence * evidence)

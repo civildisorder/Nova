@@ -50,9 +50,9 @@ Suspect::~Suspect()
 }
 
 
-Suspect::Suspect(Evidence *evidence)
+Suspect::Suspect(Evidence *&evidence)
 {
-	m_IpAddress.s_addr = evidence->m_evidencePacket.ip_src;
+	m_IpAddress.s_addr = htonl(evidence->m_evidencePacket.ip_src);
 	m_hostileNeighbors = 0;
 	m_classification = -1;
 	m_isHostile = false;
@@ -137,7 +137,7 @@ string Suspect::ToString()
 	return ss.str();
 }
 
-void Suspect::ConsumeEvidence(Evidence *evidence)
+void Suspect::ConsumeEvidence(Evidence *&evidence)
 {
 	Evidence *curEvidence = evidence, *tempEv = NULL;
 	while(curEvidence != NULL)

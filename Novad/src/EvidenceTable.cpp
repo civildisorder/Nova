@@ -18,7 +18,7 @@
 //============================================================================/*
 
 #include "EvidenceTable.h"
-#include "pthread.h"
+#include <pthread.h>
 
 using namespace std;
 
@@ -55,8 +55,7 @@ namespace Nova
 		//Pushes the evidence and enters the conditional if it's the first piece of evidence
 		if(m_table[evidence->m_evidencePacket.ip_src]->Push(evidence))
 		{
-			Evidence * temp = new Evidence();
-			temp->m_evidencePacket = evidence->m_evidencePacket;
+			Evidence * temp = new Evidence(evidence);
 			m_processingList.Push(temp);
 			//Wake up any consumers waiting for evidence
 			pthread_cond_signal(&m_cond);

@@ -67,15 +67,23 @@ protected:
 // Check adding and removing evidence
 TEST_F(SuspectTest, EvidenceAddingRemoving)
 {
-	EXPECT_NO_FATAL_FAILURE(suspect->AddEvidence(p1));
-	EXPECT_NO_FATAL_FAILURE(suspect->AddEvidence(p2));
+	Evidence *t1 = new Evidence();
+	Evidence *t2 = new Evidence();
+	*t1 = p1;
+	*t2 = p2;
+	EXPECT_NO_FATAL_FAILURE(suspect->ConsumeEvidence(t1));
+	EXPECT_NO_FATAL_FAILURE(suspect->ConsumeEvidence(t2));
 	EXPECT_TRUE(suspect->GetNeedsClassificationUpdate());
 }
 
 TEST_F(SuspectTest, EvidenceProcessing)
 {
-	EXPECT_NO_FATAL_FAILURE(suspect->AddEvidence(p1));
-	EXPECT_NO_FATAL_FAILURE(suspect->AddEvidence(p2));
+	Evidence *t1 = new Evidence();
+	Evidence *t2 = new Evidence();
+	*t1 = p1;
+	*t2 = p2;
+	EXPECT_NO_FATAL_FAILURE(suspect->ConsumeEvidence(t1));
+	EXPECT_NO_FATAL_FAILURE(suspect->ConsumeEvidence(t2));
 
 	// Calculate the feature values from the evidence
 	EXPECT_NO_FATAL_FAILURE(suspect->CalculateFeatures());
@@ -103,9 +111,13 @@ TEST_F(SuspectTest, EvidenceProcessing)
 
 TEST_F(SuspectTest, Serialization)
 {
+	Evidence *t1 = new Evidence();
+	Evidence *t2 = new Evidence();
+	*t1 = p1;
+	*t2 = p2;
 	// Just setup to get a suspect to serialize
-	EXPECT_NO_FATAL_FAILURE(suspect->AddEvidence(p1));
-	EXPECT_NO_FATAL_FAILURE(suspect->AddEvidence(p2));
+	EXPECT_NO_FATAL_FAILURE(suspect->ConsumeEvidence(t1));
+	EXPECT_NO_FATAL_FAILURE(suspect->ConsumeEvidence(t2));
 	EXPECT_NO_FATAL_FAILURE(suspect->CalculateFeatures());
 	EXPECT_NO_FATAL_FAILURE(suspect->UpdateFeatureData(true));
 

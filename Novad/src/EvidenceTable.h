@@ -20,8 +20,8 @@
 #ifndef EVIDENCETABLE_H_
 #define EVIDENCETABLE_H_
 
-#include "EvidenceQueue.h"
 #include "HashMapStructs.h"
+#include "EvidenceQueue.h"
 
 typedef Nova::HashMap<uint64_t, Nova::EvidenceQueue*, std::tr1::hash<uint64_t>, eqkey > EvidenceHashTable;
 

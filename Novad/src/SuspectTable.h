@@ -68,7 +68,7 @@ public:
 	// Adds the Suspect pointed to in 'suspect' into the table using the source of the evidence as the key;
 	// 		evidence: copy of the packet you whish to create a suspect from
 	// Returns true on Success, and false if the suspect already exists
-	bool AddNewSuspect(const Evidence& evidence);
+	//bool AddNewSuspect(const Evidence& evidence);
 
 	bool ClassifySuspect(const in_addr_t& key);
 
@@ -173,7 +173,7 @@ public:
 	//				of the linked list.
 	// Note: Every evidence object contained in the list is deallocated after use, invalidating the pointers,
 	//		this is a specialized function designed only for use by Consumer threads.
-	void ProcessEvidence(Evidence *evidence);
+	void ProcessEvidence(Evidence *&evidence);
 
 	Suspect m_emptySuspect;
 

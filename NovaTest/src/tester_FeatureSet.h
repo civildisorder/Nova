@@ -34,9 +34,13 @@ protected:
 		p2.m_evidencePacket.ip_len = (u_short)1;
 		p2.m_evidencePacket.ts = 20;
 
+		Evidence *t1 = new Evidence();
+		Evidence *t2 = new Evidence();
+		*t1 = p1;
+		*t2 = p2;
 
-		fset.UpdateEvidence(p1);
-		fset.UpdateEvidence(p2);
+		fset.UpdateEvidence(t1);
+		fset.UpdateEvidence(t2);
 		fset.CalculateAll();
 	}
 

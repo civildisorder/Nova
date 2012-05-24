@@ -452,7 +452,7 @@ void *ConsumerLoop(void *ptr)
 	while(true)
 	{
 		//Blocks on a mutex/condition if there's no evidence to process
-		Evidence * cur = suspectEvidence.GetEvidence();
+		Evidence *cur = suspectEvidence.GetEvidence();
 		suspects.ProcessEvidence(cur);
 	}
 	return NULL;
