@@ -91,7 +91,7 @@ void Doppelganger::UpdateDoppelganger()
 		if(!found)
 		{
 			ss.str("");
-			inAddr.s_addr = (in_addr_t)temp;
+			inAddr.s_addr = htonl((in_addr_t)temp);
 			ss << prefix << inet_ntoa(inAddr) << suffix;
 			if(system(ss.str().c_str()) != 0)
 			{
@@ -108,9 +108,8 @@ void Doppelganger::UpdateDoppelganger()
 		m_suspectKeys.pop_back();
 
 		ss.str("");
-		inAddr.s_addr = (in_addr_t)temp;
+		inAddr.s_addr = htonl((in_addr_t)temp);
 		ss << prefix << inet_ntoa(inAddr) << suffix;
-
 
 		if(system(ss.str().c_str()) != 0)
 		{

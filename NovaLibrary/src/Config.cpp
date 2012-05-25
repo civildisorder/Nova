@@ -1571,6 +1571,19 @@ bool Config::GetGotoLive()
 	return m_gotoLive;
 }
 
+bool Config::GetUseAllInterfaces()
+{
+	Lock lock(&m_lock, true);
+	return m_ifIsDefault;
+}
+
+bool Config::GetUseAnyLoopback()
+{
+	Lock lock(&m_lock, true);
+	return m_loIsDefault;
+}
+
+
 string Config::GetInterface(uint i)
 {
 	Lock lock(&m_lock, true);
@@ -1585,15 +1598,13 @@ string Config::GetInterface(uint i)
 vector<string> Config::GetInterfaces()
 {
 	Lock lock(&m_lock, true);
-	vector<string> ret = m_interfaces;
-	return ret;
+	return m_interfaces;
 }
 
 uint Config::GetInterfaceCount()
 {
 	Lock lock(&m_lock, true);
-	uint ret = m_interfaces.size();
-	return ret;
+	return m_interfaces.size();
 }
 
 bool Config::GetIsDmEnabled()
@@ -1720,6 +1731,18 @@ string Config::GetGroup()
 {
 	Lock lock(&m_lock, true);
 	return m_group;
+}
+
+void Config::SetUseAllInterfaces(bool which)
+{
+	Lock lock(&m_lock, false);
+	m_ifIsDefault = which;
+}
+
+void Config::SetUseAnyLoopback(bool which)
+{
+	Lock lock(&m_lock, false);
+	m_loIsDefault = which;
 }
 
 void Config::SetClassificationThreshold(double classificationThreshold)

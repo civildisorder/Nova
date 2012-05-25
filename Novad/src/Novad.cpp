@@ -798,8 +798,9 @@ bool Start_Packet_Handler()
 		for(u_char i = 1; i < handles.size(); i++)
 		{
 			pthread_t readThread;
-			u_char * temp = new u_char(i);
+			u_char temp = i;
 			pthread_create(&readThread, NULL, StartPcapLoop, &temp);
+			pthread_detach(readThread);
 		}
 		if((handles.empty()) || (handles[0] == NULL))
 		{
@@ -811,6 +812,7 @@ bool Start_Packet_Handler()
 		u_char index = 0;
 		pthread_t consumer;
 		pthread_create(&consumer, NULL, ConsumerLoop, NULL);
+		pthread_detach(consumer);
 		pcap_loop(handles[0], -1, Packet_Handler, &index);
 	}
 	return false;
@@ -824,7 +826,7 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 		LOG(ERROR, "Failed to capture packet!","");
 		return;
 	}
-	switch(ntohs(((struct ether_header *)packet)->ether_type))
+	switch(ntohs(*(uint16_t *)(packet+12)))
 	{
 		//IPv4, currently the only handled case
 		case ETHERTYPE_IP:
@@ -840,6 +842,11 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 			suspectEvidence.InsertEvidence(evidencePacket);
 			return;
 		}
+		//Ignore IPV6
+		case ETHERTYPE_IPV6:
+		{
+			return;
+		}
 		//Ignore ARP
 		case ETHERTYPE_ARP:
 		{
@@ -848,7 +855,7 @@ void Packet_Handler(u_char *index,const struct pcap_pkthdr* pkthdr,const u_char*
 		default:
 		{
 			stringstream ss;
-			ss << "Ignoring a packet with unhandled protocol #" << (uint8_t)(ntohs(((struct ether_header *)packet)->ether_type));
+			ss << "Ignoring a packet with unhandled protocol #" << (uint16_t)(ntohs(((struct ether_header *)packet)->ether_type));
 			LOG(DEBUG, ss.str(), "");
 			return;
 		}

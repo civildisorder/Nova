@@ -46,10 +46,6 @@ using namespace std;
 NovaConfig::NovaConfig(QWidget *parent, string home)
     : QMainWindow(parent)
 {
-
-	m_radioButtons = new QButtonGroup(ui.interfaceHLayout);
-	m_radioButtons->setExclusive(true);
-	m_interfaceCheckBoxes = new QButtonGroup(ui.interfaceHLayout);
 	m_portMenu = new QMenu(this);
 	m_profileTreeMenu = new QMenu(this);
 	m_nodeTreeMenu = new QMenu(this);
@@ -82,6 +78,8 @@ NovaConfig::NovaConfig(QWidget *parent, string home)
 
 	SetInputValidators();
 	m_loading->lock();
+	m_radioButtons = new QButtonGroup(ui.loopbackGroupBox);
+	m_interfaceCheckBoxes = new QButtonGroup(ui.interfaceGroupBox);
 	//Read NOVAConfig, pull honeyd info from parent, populate GUI
 	LoadNovadPreferences();
 	m_honeydConfig->LoadAllTemplates();
@@ -1099,6 +1097,8 @@ void NovaConfig::LoadNovadPreferences()
 		ifList.pop_back();
 	}
 
+	ui.useAllIfCheckBox->setChecked(Config::Inst()->GetUseAllInterfaces());
+	ui.useAnyLoopbackCheckBox->setChecked(Config::Inst()->GetUseAnyLoopback());
 	ui.dataEdit->setText(QString::fromStdString(Config::Inst()->GetPathTrainingFile()));
 	ui.saAttemptsMaxEdit->setText(QString::number(Config::Inst()->GetSaMaxAttempts()));
 	ui.saAttemptsTimeEdit->setText(QString::number(Config::Inst()->GetSaSleepDuration()));
@@ -1283,7 +1283,9 @@ void NovaConfig::on_okButton_clicked()
 	m_honeydConfig->SaveAllTemplates();
 	m_honeydConfig->WriteHoneydConfiguration(Config::Inst()->GetUserPath());
 
+	LoadHaystackConfiguration();
 	m_mainwindow->InitConfiguration();
+
 	m_loading->unlock();
 	this->close();
 }
@@ -1348,18 +1350,23 @@ bool NovaConfig::SaveConfigurationToFile()
 	Config::Inst()->SetClassificationTimeout(this->ui.ceFrequencyEdit->displayText().toInt());
 	Config::Inst()->SetClassificationThreshold(this->ui.ceThresholdEdit->displayText().toDouble());
 	Config::Inst()->SetEnabledFeatures(ss.str());
+
 	QList<QAbstractButton *> qButtonList = m_interfaceCheckBoxes->buttons();
 	Config::Inst()->ClearInterfaces();
+	Config::Inst()->SetUseAllInterfaces(ui.useAllIfCheckBox->isChecked());
+
 	for(int i = 0; i < qButtonList.size(); i++)
 	{
-		//XXX configuration for selection 'any' interface aka 'default' (all ethernet interfaces selected)
 		QCheckBox * checkBoxPtr = (QCheckBox *)qButtonList.at(i);
 		if(checkBoxPtr->isChecked())
 		{
 			Config::Inst()->AddInterface(checkBoxPtr->text().toStdString());
 		}
 	}
+
 	qButtonList = m_radioButtons->buttons();
+
+	Config::Inst()->SetUseAnyLoopback(ui.useAnyLoopbackCheckBox->isChecked());
 	for(int i = 0; i < qButtonList.size(); i++)
 	{
 		//XXX configuration for selection 'any' interface aka 'default'
@@ -3314,4 +3321,14 @@ void NovaConfig::on_hsSaveTypeComboBox_currentIndexChanged(int index)
 			break;
 		}
 	}
+}
+
+void NovaConfig::on_useAllIfCheckBox_stateChanged()
+{
+	ui.interfaceGroupBox->setEnabled(!ui.useAllIfCheckBox->isChecked());
+}
+
+void NovaConfig::on_useAnyLoopbackCheckBox_stateChanged()
+{
+	ui.loopbackGroupBox->setEnabled(!ui.useAnyLoopbackCheckBox->isChecked());
 }

@@ -59,13 +59,13 @@ Evidence::Evidence(const u_char *packet_at_ip_header, const pcap_pkthdr *pkthdr)
 	m_evidencePacket.ip_dst = ntohl(*(uint32_t *)offset);
 
 	//Initialize port to 0 in case we don't have a TCP or UDP packet
-	m_evidencePacket.dst_port = 0;
+	m_evidencePacket.dst_port = -1;
 
 	//If TCP or UDP
 	if((m_evidencePacket.ip_p == 6) || (m_evidencePacket.ip_p == 17))
 	{
 		//Point to the beginning of the tcp or udp header + 2 to get the destination port, same offset after ip header for both
-		offset = packet_at_ip_header + ip_hl + 2;
+		offset = packet_at_ip_header + ip_hl*4 + 2;
 		//read in the dest port
 		m_evidencePacket.dst_port = ntohs(*(uint16_t *)offset);
 	}

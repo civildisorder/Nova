@@ -221,6 +221,9 @@ void on_dmIPSpinBox_3_valueChanged();
 //Haystack storage type combo box
 void on_hsSaveTypeComboBox_currentIndexChanged(int index);
 
+void on_useAllIfCheckBox_stateChanged();
+void on_useAnyLoopbackCheckBox_stateChanged();
+
 private:
 	void SetInputValidators();
 

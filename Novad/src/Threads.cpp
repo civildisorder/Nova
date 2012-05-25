@@ -443,6 +443,7 @@ void *StartPcapLoop(void *ptr)
 	}
 	pthread_t consumer;
 	pthread_create(&consumer, NULL, ConsumerLoop, NULL);
+	pthread_detach(consumer);
 	pcap_loop(handles[*index], -1, Packet_Handler, index);
 	return NULL;
 }

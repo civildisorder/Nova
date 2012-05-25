@@ -57,7 +57,6 @@ public:
     std::string GetDoppelInterface();
     std::string GetDoppelIp();
     std::string GetEnabledFeatures();
-    bool IsFeatureEnabled(uint i) ;
     uint GetEnabledFeatureCount();
     std::string GetInterface(uint i);
     std::vector<std::string> GetInterfaces();
@@ -77,6 +76,11 @@ public:
     bool GetIsDmEnabled();
     bool GetIsTraining();
     bool GetGotoLive();
+    bool IsFeatureEnabled(uint i);
+
+    bool GetUseAllInterfaces();
+    bool GetUseAnyLoopback();
+
 
     int GetClassificationTimeout();
     int GetDataTTL();
@@ -98,6 +102,9 @@ public:
     void AddInterface(std::string interface);
     void RemoveInterface(std::string interface);
     void ClearInterfaces();
+    void SetUseAllInterfaces(bool which);
+    void SetUseAnyLoopback(bool which);
+
     void SetClassificationThreshold(double classificationThreshold);
     void SetClassificationTimeout(int classificationTimeout);
     void SetConfigFilePath(std::string configFilePath);
