@@ -44,7 +44,7 @@ all: novad
 novad: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++ -L../../NovaLibrary/Debug/ -pthread -o"novad" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L../../NovaLibrary/Debug/ -L/usr/lib/postgresql/9.1/lib -L/usr/local/pqxx/lib -L/usr/local/lib/ -L/usr/local/pgsql/lib -pthread -o"novad" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

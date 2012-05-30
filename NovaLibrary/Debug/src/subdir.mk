@@ -6,6 +6,7 @@
 CPP_SRCS += \
 ../src/ClassificationEngine.cpp \
 ../src/Config.cpp \
+../src/DatabaseAccessor.cpp \
 ../src/Doppelganger.cpp \
 ../src/Evidence.cpp \
 ../src/EvidenceQueue.cpp \
@@ -22,6 +23,7 @@ CPP_SRCS += \
 OBJS += \
 ./src/ClassificationEngine.o \
 ./src/Config.o \
+./src/DatabaseAccessor.o \
 ./src/Doppelganger.o \
 ./src/Evidence.o \
 ./src/EvidenceQueue.o \
@@ -38,6 +40,7 @@ OBJS += \
 CPP_DEPS += \
 ./src/ClassificationEngine.d \
 ./src/Config.d \
+./src/DatabaseAccessor.d \
 ./src/Doppelganger.d \
 ./src/Evidence.d \
 ./src/EvidenceQueue.d \
