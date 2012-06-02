@@ -145,8 +145,9 @@ void HandleTrainingPacket(u_char *index,const struct pcap_pkthdr* pkthdr,const u
 		{
 			//Prepare Packet structure
 			Evidence * evidencePacket = new Evidence(packet + sizeof(struct ether_header), pkthdr);
+			in_addr_t suspectAddress = evidencePacket->m_evidencePacket.ip_src;
 			suspects.ProcessEvidence(evidencePacket);
-			update(evidencePacket->m_evidencePacket.ip_src);
+			update(suspectAddress);
 
 			return;
 		}
