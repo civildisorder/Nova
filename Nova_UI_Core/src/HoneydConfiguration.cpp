@@ -1370,21 +1370,14 @@ Nova::NodeProfile *HoneydConfiguration::GetProfile(std::string profileName)
 	{
 		return NULL;
 	}
-	else
-	{
-		NodeProfile *ret = new NodeProfile();
-		*ret = m_profiles[profileName];
-		return ret;
-	}
+	return &m_profiles[profileName];
 }
 
 Nova::Port *HoneydConfiguration::GetPort(std::string portName)
 {
 	if(m_ports.keyExists(portName))
 	{
-		Port *p = new Port();
-		*p = m_ports[portName];
-		return p;
+		return &m_ports[portName];
 	}
 	return NULL;
 }
@@ -1832,9 +1825,7 @@ Node *HoneydConfiguration::GetNode(std::string nodeName)
 			+ nodeName + string(" that doesn't exist"), "");
 		return NULL;
 	}
-	Node *ret = new Node();
-	*ret = m_nodes[nodeName];
-	return ret;
+	return &m_nodes[nodeName];
 }
 
 std::string HoneydConfiguration::GetNodeSubnet(std::string nodeName)
