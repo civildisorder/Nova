@@ -132,7 +132,7 @@ Handle<Value> HoneydConfigBinding::GetNode(const Arguments& args)
 	}
 
 	std::string name = cvv8::CastFromJS<std::string>(args[0]);
-	return scope.Close(HoneydNodeJs::WrapNode(obj->m_conf->GetNode(name)));
+	return scope.Close(HoneydNodeJs::WrapNode(*obj->m_conf->GetNode(name)));
 }
 
 Handle<Value> HoneydConfigBinding::GetProfile(const Arguments& args)
@@ -146,7 +146,7 @@ Handle<Value> HoneydConfigBinding::GetProfile(const Arguments& args)
   }
 
   std::string name = cvv8::CastFromJS<std::string>(args[0]);
-  return scope.Close(HoneydNodeJs::WrapProfile(obj->m_conf->GetProfile(name)));
+  return scope.Close(HoneydNodeJs::WrapProfile(*obj->m_conf->GetProfile(name)));
 }
 
 
@@ -167,7 +167,7 @@ Handle<Value> HoneydConfigBinding::GetPorts(const Arguments& args)
     for (uint i = 0; i < ports.size(); i++) {
         Port *copy = new Port();
         *copy = ports.at(i);
-        portArray->Set(v8::Number::New(i), HoneydNodeJs::WrapPort(copy));
+        portArray->Set(v8::Number::New(i), HoneydNodeJs::WrapPort(*copy));
     }
 
     return scope.Close(portArray);

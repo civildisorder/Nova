@@ -10,7 +10,7 @@ using namespace v8;
 using namespace Nova;
 using namespace std;
 
-Handle<Object> HoneydNodeJs::WrapNode(Node* node)
+Handle<Object> HoneydNodeJs::WrapNode(Node node)
 {
     HandleScope scope;  
     // Setup the template for the type if it hasn't been already
@@ -36,14 +36,14 @@ Handle<Object> HoneydNodeJs::WrapNode(Node* node)
     // Instantiate the object with the constructor
     Handle<Object> result = ctor->NewInstance();
     // Wrap the native object in an handle and set it in the internal field to get at later.
-    Handle<External> nodePtr = External::New(node);
+    Handle<External> nodePtr = External::New(&node);
     result->SetInternalField(0,nodePtr);
 
     return scope.Close(result);
 }
 
 
-Handle<Object> HoneydNodeJs::WrapPort(Port *port)
+Handle<Object> HoneydNodeJs::WrapPort(Port port)
 {
     HandleScope scope;  
 
@@ -69,13 +69,13 @@ Handle<Object> HoneydNodeJs::WrapPort(Port *port)
     // Instantiate the object with the constructor
     Handle<Object> result = ctor->NewInstance();
     // Wrap the native object in an handle and set it in the internal field to get at later.
-    Handle<External> portPtr = External::New(port);
+    Handle<External> portPtr = External::New(&port);
     result->SetInternalField(0,portPtr);
 
     return scope.Close(result);
 }
 
-Handle<Object> HoneydNodeJs::WrapProfile(NodeProfile *pfile)
+Handle<Object> HoneydNodeJs::WrapProfile(NodeProfile pfile)
 {
     HandleScope scope;  
     // Setup the template for the type if it hasn't been already
@@ -112,7 +112,7 @@ Handle<Object> HoneydNodeJs::WrapProfile(NodeProfile *pfile)
     // Instantiate the object with the constructor
     Handle<Object> result = ctor->NewInstance();
     // Wrap the native object in an handle and set it in the internal field to get at later.
-    Handle<External> profilePtr = External::New(pfile);
+    Handle<External> profilePtr = External::New(&pfile);
     result->SetInternalField(0,profilePtr);
 
     return scope.Close(result);
