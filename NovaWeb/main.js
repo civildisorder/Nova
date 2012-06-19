@@ -18,6 +18,14 @@ var https = require('https');
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
 var mysql = require('mysql');
+var sqlite = require('sqlite-fts');
+var db = new sqlite.Database();
+db.open("/usr/share/nova/data.db", function(err) {
+  if (err) {
+      console.log("Tonight. You.");
+      throw error;
+  }
+});
 var validCheck = require('validator').check;
 var sanitizeCheck = require('validator').sanitize;
 
@@ -56,9 +64,9 @@ passport.use(new LocalStrategy(
     var user = username;
     process.nextTick(function()
     {
-         client.query(
-            'SELECT user, pass FROM ' + credTb + ' WHERE pass = SHA1(' + client.escape(password) + ')',
-            function selectCb(err, results, fields, fn)
+         db.query(
+            'SELECT user, pass FROM ' + credTb + ' WHERE pass = ' + client.escape(password) + '',
+            function selectCb(err, results)
             {
               if(err) 
               {
@@ -307,9 +315,9 @@ app.get('/configWhitelist', ensureAuthenticated, function(req, res) {
 
 app.get('/editUsers', ensureAuthenticated, function(req, res) {
 	var usernames = new Array();
-  client.query(
+  db.query(
     'SELECT user FROM ' + credTb,
-    function (err, results, fields) {
+    function (err, results) {
       if(err) {
         throw err;
       }
@@ -363,7 +371,7 @@ app.post('/createNewUser', ensureAuthenticated, function(req, res) {
 	var password = req.body["password"];
 	var userName = req.body["username"];
 	
-    client.query('SELECT user FROM ' + credTb + ' WHERE user = ' + client.escape(userName) + '',
+    db.query('SELECT user FROM ' + credTb + ' WHERE user = ' + client.escape(userName) + '',
     function selectCb(err, results, fields) {
       if(err) {
 	  	res.render('error.jade', { locals: { redirectLink: "/createNewUser", errorDetails: "Unable to access authentication database" }});
@@ -373,7 +381,7 @@ app.post('/createNewUser', ensureAuthenticated, function(req, res) {
       if(results[0] == undefined)
       {
 	    
-        client.query('INSERT INTO ' + credTb + ' values(' + client.escape(userName) + ', SHA1(' + client.escape(password) + '))');
+        db.query('INSERT INTO ' + credTb + ' values(' + client.escape(userName) + ', ' + client.escape(password) + ')');
 		res.render('saveRedirect.jade', { locals: {redirectLink: "'/'"}})	
         return;
       } 
@@ -390,7 +398,7 @@ app.post('/createInitialUser', ensureAuthenticated, function(req, res) {
 	var password = req.body["password"];
 	var userName = req.body["username"];
 	
-    client.query('SELECT user FROM ' + credTb + ' WHERE user = ' + client.escape(userName) + '',
+    db.query('SELECT user FROM ' + credTb + ' WHERE user = ' + client.escape(userName) + '',
     function selectCb(err, results, fields) {
       if(err) {
 	  	res.render('error.jade', { locals: { redirectLink: "/createNewUser", errorDetails: "Unable to access authentication database" }});
@@ -400,8 +408,8 @@ app.post('/createInitialUser', ensureAuthenticated, function(req, res) {
       if(results[0] == undefined)
       {
 	    
-        client.query('INSERT INTO ' + credTb + ' values(' + client.escape(userName) + ', SHA1(' + client.escape(password) + '))');
-		client.query('DELETE FROM ' + credTb + ' WHERE user = ' + client.escape('nova'));
+        db.query('INSERT INTO ' + credTb + ' values(' + client.escape(userName) + ', ' + client.escape(password) + ')');
+		db.query('DELETE FROM ' + credTb + ' WHERE user = ' + client.escape('nova'));
 		res.render('saveRedirect.jade', { locals: {redirectLink: "'setup2'"}})	
         return;
       } 
@@ -710,7 +718,7 @@ everyone.now.deleteUserEntry = function(usernamesToDelete, callback)
 	for (var i = 0; i < usernamesToDelete.length; i++) {
 		username = String(usernamesToDelete[i]);
 		var query = 'DELETE FROM ' + credTb + ' WHERE user = ' + client.escape(username);
- 		client.query(query);
+ 		db.query(query);
 	}
 
 	// TODO: Error handling? Bit of a pain async. could change to single SQL query and 
@@ -719,8 +727,8 @@ everyone.now.deleteUserEntry = function(usernamesToDelete, callback)
 }
 
 everyone.now.updateUserPassword = function (username, newPassword, callback) {
-	var query = 'UPDATE ' + credTb + ' SET pass = SHA1(' + client.escape(String(newPassword)) + ') WHERE user = ' + client.escape(String(username));
- 	client.query(query,
+	var query = 'UPDATE ' + credTb + ' SET pass = ' + client.escape(String(newPassword)) + ' WHERE user = ' + client.escape(String(username));
+ 	db.query(query,
     function selectCb(err, results, fields) {
     	if(err) {
         	callback(false, "Unable to access user database: " + err);
@@ -940,7 +948,7 @@ function objCopy(src,dst) {
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     if (req.url == '/' || req.url == '/suspects') {
-        client.query('SELECT user FROM ' + credTb + ' WHERE user = ' + client.escape('nova'),
+        db.query('SELECT user FROM ' + credTb + ' WHERE user = ' + client.escape('nova'),
         function selectCb(err, results, fields) {
             if(!err) {
                 if (results.length >= 1) {
@@ -967,8 +975,8 @@ function ensureAuthenticated(req, res, next) {
 function queryCredDb(check) {
     console.log("checkPass value before queryCredDb call: " + check);
     
-    client.query(
-    'SELECT pass FROM ' + credTb + ' WHERE pass = SHA1(' + client.escape(check) + ')',
+    db.query(
+    'SELECT pass FROM ' + credTb + ' WHERE pass = ' + client.escape(check) + '',
     function selectCb(err, results, fields) {
       if(err) {
         throw err;
