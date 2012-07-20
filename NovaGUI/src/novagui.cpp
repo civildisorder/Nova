@@ -522,7 +522,7 @@ void NovaGUI::DrawAllSuspects()
 				}
 			}
 		}
-		ui.suspectList->insertItem(i, item);
+		//ui.suspectList->insertItem(i, item);
 
 		//Point to the new items
 		it->second.item = item;
@@ -536,6 +536,7 @@ void NovaGUI::DrawAllSuspects()
 //*NOTE This slot is not thread safe, make sure you set appropriate locks before sending a signal to this slot
 void NovaGUI::DrawSuspect(in_addr_t suspectAddr)
 {
+	ui.suspectList->setSortingEnabled(false);
 	m_editingSuspectList = true;
 	QString str;
 	QBrush brush;
@@ -543,6 +544,22 @@ void NovaGUI::DrawSuspect(in_addr_t suspectAddr)
 	in_addr_t addr;
 
 	Lock lock(&suspectTableLock);
+
+	double lastClassification = 2;
+	double currentClassification;
+	for (int i = 0; i < ui.suspectList->count(); i++)
+	{
+		addr = inet_addr(ui.suspectList->item(i)->text().toStdString().c_str());
+		currentClassification = SuspectTable[addr].suspect->GetClassification();
+		cout << i << " " << currentClassification << endl;
+		if (lastClassification < currentClassification)
+		{
+			cout << "Error: List isn't sorted anymore" << endl;
+		}
+		lastClassification = currentClassification;
+	}
+	cout << endl << endl;
+
 	suspectItem *sItem = &SuspectTable[suspectAddr];
 	//Extract Information
 	str = (QString) string(inet_ntoa(sItem->suspect->GetInAddr())).c_str();
@@ -567,12 +584,11 @@ void NovaGUI::DrawSuspect(in_addr_t suspectAddr)
 	brush.setColor(color);
 	brush.setStyle(Qt::NoBrush);
 
+
+	bool selected = false;
 	//If the item exists
 	if(sItem->item != NULL)
 	{
-		sItem->item->setText(str);
-		sItem->item->setForeground(brush);
-		bool selected = false;
 		int current_row = ui.suspectList->currentRow();
 
 		//If this is our current selection flag it so we can update the selection if we change the index
@@ -581,77 +597,12 @@ void NovaGUI::DrawSuspect(in_addr_t suspectAddr)
 			selected = true;
 		}
 
-		ui.suspectList->removeItemWidget(sItem->item);
 
-		if(ui.suspectList->count())
-		{
-			int step = 1;
-			int index = (int)(ui.suspectList->count()/2);
-			bool indexFound = false;
+		cout << "Size " << ui.suspectList->count();
+		ui.suspectList->takeItem(ui.suspectList->row(sItem->item));
+		cout << "Size " << ui.suspectList->count();
 
-			double sClassification = sItem->suspect->GetClassification();
-			while(!indexFound)
-			{
-				addr = inet_addr(ui.suspectList->item(index)->text().toStdString().c_str());
-				step++;
 
-				//If the current suspect is less hostile than us
-				if(SuspectTable[addr].suspect->GetClassification() < sClassification)
-				{
-					//If we've hit the start of the list (most hostile position)
-					if(index == 0)
-					{
-						indexFound = true;
-						break;
-					}
-					//If the suspect before this one is more hostile than us, we've found our position
-					addr = inet_addr(ui.suspectList->item(index-1)->text().toStdString().c_str());
-					if(SuspectTable[addr].suspect->GetClassification() >= sClassification)
-					{
-						indexFound = true;
-						break;
-					}
-					index -= (int)(ui.suspectList->count()/(::pow(2, step)));
-				}
-				//If the current suspect is more hostile than us
-				else if(SuspectTable[addr].suspect->GetClassification() > sClassification)
-				{
-					//If we've hit the end of the list (least hostile position)
-					if(index == ui.suspectList->count())
-					{
-						indexFound = true;
-						break;
-					}
-					//If the suspect after this one is less hostile than us, we've found our position
-					addr = inet_addr(ui.suspectList->item(index+1)->text().toStdString().c_str());
-					if(SuspectTable[addr].suspect->GetClassification() <= sClassification)
-					{
-						indexFound = true;
-						break;
-					}
-					index += (int)(ui.suspectList->count()/(::pow(2, step)));
-				}
-				//If the classification is the same we can insert immediately
-				else
-				{
-					indexFound = true;
-					break;
-				}
-			}
-
-			ui.suspectList->insertItem(index, sItem->item);
-
-			//If we need to update the selection
-			if(selected)
-			{
-				ui.suspectList->setCurrentRow(index);
-			}
-		}
-		else
-		{
-			ui.suspectList->insertItem(0, sItem->item);
-			ui.suspectList->setCurrentRow(0);
-		}
 	}
 	//If the item doesn't exist
 	else
@@ -659,73 +610,82 @@ void NovaGUI::DrawSuspect(in_addr_t suspectAddr)
 		//Create the Suspect in list with info set alignment and color
 		sItem->item = new QListWidgetItem(str,0);
 		sItem->item->setTextAlignment(Qt::AlignLeft|Qt::AlignBottom);
-		sItem->item->setForeground(brush);
-
-		if(ui.suspectList->count())
-		{
-			int step = 1;
-			int index = (int)(ui.suspectList->count()/2);
-			bool indexFound = false;
-
-			double sClassification = sItem->suspect->GetClassification();
-			while(!indexFound)
-			{
-				addr = inet_addr(ui.suspectList->item(index)->text().toStdString().c_str());
-				step++;
-
-				//If the current suspect is less hostile than us
-				if(SuspectTable[addr].suspect->GetClassification() < sClassification)
-				{
-					//If we've hit the start of the list (most hostile position)
-					if(index == 0)
-					{
-						indexFound = true;
-						break;
-					}
-					//If the suspect before this one is more hostile than us, we've found our position
-					addr = inet_addr(ui.suspectList->item(index-1)->text().toStdString().c_str());
-					if(SuspectTable[addr].suspect->GetClassification() >= sClassification)
-					{
-						indexFound = true;
-						break;
-					}
-					index -= (int)(ui.suspectList->count()/(::pow(2, step)));
-				}
-				//If the current suspect is more hostile than us
-				else if(SuspectTable[addr].suspect->GetClassification() > sClassification)
-				{
-					//If we've hit the end of the list (least hostile position)
-					if(index == ui.suspectList->count())
-					{
-						break;
-					}
-					//If the suspect after this one is less hostile than us, we've found our position
-					addr = inet_addr(ui.suspectList->item(index+1)->text().toStdString().c_str());
-					if(SuspectTable[addr].suspect->GetClassification() <= sClassification)
-					{
-						indexFound = true;
-						break;
-					}
-					index += (int)(ui.suspectList->count()/(::pow(2, step)));
-				}
-				//If the classification is the same we can insert immediately
-				else
-				{
-					indexFound = true;
-					break;
-				}
-			}
-			ui.suspectList->insertItem(index, sItem->item);
-		}
-		else
-		{
-			ui.suspectList->insertItem(0, sItem->item);
-			ui.suspectList->setCurrentRow(0);
-		}
 	}
 	sItem->item->setToolTip(QString(sItem->suspect->ToString().c_str()));
+	sItem->item->setForeground(brush);
+
+
+	int index = -1;
+	if (!ui.suspectList->count())
+	{
+		index = 0;
+	}
+	else
+	{
+		int low = 0;
+		int high = ui.suspectList->count() - 1;
+		int mid;
+		double sClassification = sItem->suspect->GetClassification();
+		double cClassification;
+		while (low <= high)
+		{
+			mid = low + (high - low)/2;
+			addr = inet_addr(ui.suspectList->item(mid)->text().toStdString().c_str());
+			cClassification = SuspectTable[addr].suspect->GetClassification();
+			cout << "Comparing to " << cClassification << endl;
+			if (cClassification < sClassification)
+			{
+					high = mid - 1;
+					if (low > high)
+					{
+						index = mid;
+						break;
+					}
+			}
+			else if (cClassification > sClassification)
+			{
+					low = mid + 1;
+					if (low > high)
+					{
+						index = mid + 1;
+						break;
+					}
+			}
+			else
+			{
+				index = mid;
+				break;
+			}
+
+		}
+		cout << "Inserting at " << index << endl;
+	}
+
+	ui.suspectList->insertItem(index, sItem->item);
+
+	//If we need to update the selection
+	if(selected)
+	{
+		ui.suspectList->setCurrentRow(index);
+	}
+
+
 	UpdateSuspectWidgets();
 	m_editingSuspectList = false;
+
+	lastClassification = 2;
+	for (int i = 0; i < ui.suspectList->count(); i++)
+	{
+		addr = inet_addr(ui.suspectList->item(i)->text().toStdString().c_str());
+		currentClassification = SuspectTable[addr].suspect->GetClassification();
+		cout << i << " " << currentClassification << endl;
+		if (lastClassification < currentClassification)
+		{
+			cout << "Error: List isn't sorted anymore" << endl;
+		}
+		lastClassification = currentClassification;
+	}
+	cout << endl << endl;
 }
 
 void NovaGUI::UpdateSuspectWidgets()
