@@ -19,7 +19,7 @@ var util = require('util');
 var https = require('https');
 var passport = require('passport');
 var BasicStrategy = require('passport-http').BasicStrategy;
-var mysql = require('mysql');
+var sql = require('sqlite3');
 var validCheck = require('validator').check;
 var sanitizeCheck = require('validator').sanitize;
 	
@@ -47,12 +47,17 @@ var DATABASE_HOST = config.ReadSetting("DATABASE_HOST");
 var DATABASE_USER = config.ReadSetting("DATABASE_USER");
 var DATABASE_PASS = config.ReadSetting("DATABASE_PASS");
 
-var client = mysql.createClient({
-  host: DATABASE_HOST
-  , user: DATABASE_USER
-  , password: DATABASE_PASS
-  , database: credDb
-});
+var databaseOpenResult = function(err) {
+	if (err == null) {
+		console.log("Opened sqlite3 database file.");
+	} else {
+		console.log("Error opening sqlite3 database file: " + err);
+	}
+}
+
+var db = new sql.Database("/usr/share/nova/database.db", sqlite3.OPEN_READWRITE, databaseOpenResult);
+
+
 
 passport.serializeUser(function(user, done) {
   done(null, user);
