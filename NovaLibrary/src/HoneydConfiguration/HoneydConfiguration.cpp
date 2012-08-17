@@ -2193,13 +2193,16 @@ string HoneydConfiguration::FindSubnet(in_addr_t ip)
 //Inserts the profile into the honeyd configuration
 //	profile: pointer to the profile you wish to add
 //	Returns (true) if the profile could be created, (false) if it cannot.
-bool HoneydConfiguration::AddProfile(NodeProfile *profile)
+bool HoneydConfiguration::AddProfile(NodeProfile &targetProfile)
 {
-	if(!m_profiles.keyExists(profile->m_name))
+	if(!m_profiles.keyExists(targetProfile.m_name))
 	{
-		m_profiles[profile->m_name] = *profile;
-		CreateProfileTree(profile->m_name);
-		UpdateProfileTree(profile->m_name, ALL);
+		m_profiles[targetProfile.m_name] = targetProfile;
+		if(!UpdateProfile(targetProfile.m_name))
+		{
+			LOG(ERROR, "Unable to update target profile '" + targetProfile.m_name + "'.", "");
+			return false;
+		}
 		return true;
 	}
 	return false;
@@ -2241,15 +2244,19 @@ bool HoneydConfiguration::AddGroup(string groupName)
 	return true;
 }
 
+//This function simply changes a profiles old name to the given new name
+// oldName: name of the profile you wish to rename
+// newName: the new name you wish to give a profile
+// *Note: This function stands alone, you simply need to call it to save all changes.
 bool HoneydConfiguration::RenameProfile(string oldName, string newName)
 {
 	//If item text and profile name don't match, we need to update
-	if(oldName.compare(newName) && (m_profiles.keyExists(oldName)) && !(m_profiles.keyExists(newName)))
+	if(oldName.compare(newName) && (m_profiles.keyExists(oldName)) && !m_profiles.keyExists(newName))
 	{
 		//Set the profile to the correct name and put the profile in the table
 		NodeProfile assign = m_profiles[oldName];
+		assign.m_name = newName;
 		m_profiles[newName] = assign;
-		m_profiles[newName].m_name = newName;
 
 		//Find all nodes who use this profile and update to the new one
 		for(NodeTable::iterator it = m_nodes.begin(); it != m_nodes.end(); it++)
@@ -2260,21 +2267,24 @@ bool HoneydConfiguration::RenameProfile(string oldName, string newName)
 			}
 		}
 
+		//Change the parent of all children profiles
 		for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
 		{
 			if(!it->second.m_parentProfile.compare(oldName))
 			{
-				InheritProfile(it->first, newName);
+				it->second.m_parentProfile = newName;
 			}
 		}
-
-		if(!UpdateProfileTree(newName, ALL))
+		if(!UpdateProfile(newName))
 		{
-			LOG(ERROR, string("Couldn't update " + oldName + "'s profile tree."), "");
+			LOG(ERROR, "Unable to update profile tree of profile '" + newName + "'.", "");
+			return false;
 		}
+		m_profiles[oldName].m_nodeKeys.clear();
 		if(!DeleteProfile(oldName))
 		{
-			LOG(ERROR, string("Couldn't delete profile " + oldName), "");
+			LOG(ERROR, "Unable to delete profile '" + oldName + "'.", "");
+			return false;
 		}
 		return true;
 	}
@@ -2283,44 +2293,54 @@ bool HoneydConfiguration::RenameProfile(string oldName, string newName)
 
 //Makes the profile named child inherit the profile named parent
 // child: the name of the child profile
-// parent: the name of the parent profile
+// parent: the name of the new parent profile
 // Returns: (true) if successful, (false) if either name could not be found
-bool HoneydConfiguration::InheritProfile(string child, string parent)
+bool HoneydConfiguration::InheritProfile(string targetProfileName, string parentProfileName)
 {
-	//If the child can be found
-	if(m_profiles.keyExists(child))
+	//If both profiles exists
+	if(m_profiles.keyExists(targetProfileName) && m_profiles.keyExists(parentProfileName))
 	{
-		//If the new parent can be found
-		if(m_profiles.keyExists(parent))
+		//Grab the old parents name
+		string oldParentName = m_profiles[targetProfileName].m_parentProfile;
+
+		//Set the childs parent to the new parent profile
+		m_profiles[targetProfileName].m_parentProfile = parentProfileName;
+		if(!UpdateProfile(targetProfileName))
 		{
-			string oldParent = m_profiles[child].m_parentProfile;
-			m_profiles[child].m_parentProfile = parent;
-			//If the child has an old parent
-			if((oldParent.compare("")) && (m_profiles.keyExists(oldParent)))
-			{
-				UpdateProfileTree(oldParent, ALL);
-			}
-			//Updates the child with the new inheritance and any modified values since last update
-			CreateProfileTree(child);
-			UpdateProfileTree(child, ALL);
-			return true;
+			LOG(ERROR, "Unable to update target profile '" + targetProfileName + "'.", "");
+			return false;
 		}
+		//If the child has an old parent
+		if(m_profiles.keyExists(oldParentName))
+		{
+			if(!UpdateProfile(oldParentName))
+			{
+				LOG(ERROR, "Unable to update previous parent profile '" + oldParentName + "'", "");
+				return false;
+			}
+		}
+		return true;
 	}
+	LOG(ERROR, "Unable to inherit profile '" + parentProfileName + "' on target profile '" + targetProfileName + "' because one or both profiles could not be found!", "");
 	return false;
 }
 
-//Iterates over the profiles, recreating the entire property tree structure
-void HoneydConfiguration::UpdateAllProfiles()
+//Recreates the entire ptree structure by rebuilding from the root
+// *Note: This function looks for the default profile and simply rebuilds the entire tree from there.
+// Returns true if successful and false if the function fails for some reason.
+bool HoneydConfiguration::UpdateAllProfiles()
 {
-	for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
+	if(m_profiles.keyExists("default"))
 	{
-		//If this is a root node
-		if(!it->second.m_parentProfile.compare(""))
+		if(!UpdateProfile("default"))
 		{
-			CreateProfileTree(it->first);
-			UpdateProfileTree(it->first, DOWN);
+			LOG(ERROR, "Updating all profiles has failed!", "");
+			return false;
 		}
+		return true;
 	}
+	LOG(CRITICAL, "Unable to locate root default profile! You may need to reinstall Nova!", "");
+	return false;
 }
 
 bool HoneydConfiguration::EnableNode(string nodeName)
@@ -2517,14 +2537,16 @@ ScriptTable &HoneydConfiguration::GetScriptTable()
 //	profileName: name of the profile you wish to delete
 //	originalCall: used internally to designate the recursion's base condition, can old be set with
 //		private access. Behavior is undefined if the first DeleteProfile call has originalCall == false
-// 	Returns: (true) if successful and (false) if the profile could not be found
+// 	Returns: (true) if successful and (false) if the profile could be deleted properly
 bool HoneydConfiguration::DeleteProfile(string profileName, bool originalCall)
 {
+	//First assert the profile exists
 	if(!m_profiles.keyExists(profileName))
 	{
-		LOG(DEBUG, "Attempted to delete profile that does not exist", "");
+		LOG(WARNING, "Attempted to delete profile that does not exist", "");
 		return false;
 	}
+
 	//Recursive descent to find and call delete on any children of the profile
 	for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
 	{
@@ -2533,76 +2555,30 @@ bool HoneydConfiguration::DeleteProfile(string profileName, bool originalCall)
 		{
 			if(!DeleteProfile(it->first, false))
 			{
+				LOG(ERROR, "Expected child profile '" + it->first + "' deletion failed", "");
 				return false;
 			}
 		}
 	}
-
-	NodeProfile p = m_profiles[profileName];
-
-	//Delete any nodes using the profile
-	vector<string> delList;
-	for(NodeTable::iterator it = m_nodes.begin(); it != m_nodes.end(); it++)
+	NodeProfile *p = &m_profiles[profileName];
+	//Remove any nodes from the configuration
+	for(uint i = 0; i < p->m_nodeKeys.size(); i++)
 	{
-		if(!it->second.m_pfile.compare(p.m_name))
+		if(!DeleteNode(p->m_nodeKeys[i]))
 		{
-			delList.push_back(it->second.m_name);
+			LOG(WARNING, "Expected child node '" + p->m_nodeKeys[i] + "' deletion failed, continue attempt at deletion.", "");
 		}
 	}
-	while(!delList.empty())
-	{
-		if(!DeleteNode(delList.back()))
-		{
-			LOG(DEBUG, "Failed to delete profile because child node deletion failed", "");
-			return false;
-		}
-		delList.pop_back();
-	}
-
+	string parentName = p->m_parentProfile;
 	m_profiles.erase(profileName);
-
-	//If it is not the original profile to be deleted skip this part
 	if(originalCall)
 	{
-		//If this profile has a parent
-		if(m_profiles.keyExists(p.m_parentProfile))
+		if(!UpdateProfile(parentName))
 		{
-			//save a copy of the parent
-			NodeProfile parent = m_profiles[p.m_parentProfile];
-
-			//point to the profiles subtree of parent-copy ptree and clear it
-			ptree *pt = &parent.m_tree.get_child("profiles");
-			pt->clear();
-
-			//Find all profiles still in the table that are siblings of deleted profile
-			// We should be using an iterator to find the original profile and erase it
-			// but boost's iterator implementation doesn't seem to be able to access data
-			// correctly and are frequently invalidated.
-
-			for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
-			{
-				if(!it->second.m_parentProfile.compare(parent.m_name))
-				{
-					//Put sibling profiles into the tree
-					pt->add_child("profile", it->second.m_tree);
-				}
-			}	//parent-copy now has the ptree of all children except deleted profile
-
-			//point to the original parent's profiles subtree and replace it with our new ptree
-			ptree *treePtr = &m_profiles[p.m_parentProfile].m_tree.get_child("profiles");
-			treePtr->clear();
-			*treePtr = *pt;
-
-			//Updates all ancestors with the deletion
-			UpdateProfileTree(p.m_parentProfile, ALL);
-		}
-		else
-		{
-			LOG(ERROR, string("Parent profile with name: ") + p.m_parentProfile + string(" doesn't exist"), "");
+			LOG(CRITICAL, "Unable to update parent profile '" + parentName + "' after profile '" + profileName + "' was deleted!", "");
+			return false;
 		}
 	}
-
-	LOG(DEBUG, "Deleted profile " + profileName, "");
 	return true;
 }
 
@@ -2611,18 +2587,17 @@ bool HoneydConfiguration::DeleteProfile(string profileName, bool originalCall)
 //	Returns (true) if successful and (false) if no profile with name 'profileName' exists
 bool HoneydConfiguration::UpdateProfileTree(string profileName, recursiveDirection direction)
 {
+	//Assert the profile exists
 	if(!m_profiles.keyExists(profileName))
 	{
+		LOG(ERROR, "Expected NodeProfile '" + profileName + "' not found in the profile table!", "");
 		return false;
 	}
-	else if(m_profiles[profileName].m_name.compare(profileName))
-	{
-		LOG(DEBUG, "Profile key: " + profileName + " does not match profile name of: "
-			+ m_profiles[profileName].m_name + ". Setting profile name to the value of profile key.", "");
-			m_profiles[profileName].m_name = profileName;
-	}
-	//Copy the profile
-	NodeProfile p = m_profiles[profileName];
+
+	//Grab the profile
+	NodeProfile &p = m_profiles[profileName];
+
+	//Separate the enum into checkable booleans
 	bool up = false, down = false;
 	switch(direction)
 	{
@@ -2644,66 +2619,45 @@ bool HoneydConfiguration::UpdateProfileTree(string profileName, recursiveDirecti
 			break;
 		}
 	}
-	if(down)
+
+	//Save any changes to the profile
+	if(!CreateProfileTree(profileName))
 	{
-		//Find all children
-		for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
-		{
-			//If child is found
-			if(!it->second.m_parentProfile.compare(p.m_name))
-			{
-				CreateProfileTree(it->second.m_name);
-				//Update the child
-				UpdateProfileTree(it->second.m_name, DOWN);
-				//Put the child in the parent's ptree
-				p.m_tree.add_child("profiles.profile", it->second.m_tree);
-			}
-		}
-		m_profiles[profileName] = p;
+		LOG(ERROR, "Unable to CreateProfileTree for profile named '" + profileName + "'!", "");
 	}
-	//If the original calling profile has a parent to update
-	if(p.m_parentProfile.compare("") && up)
-	{
-		//Get the parents name and create an empty ptree
-		NodeProfile parent = m_profiles[p.m_parentProfile];
-		ptree pt;
-		pt.clear();
 
-		//Find all children of the parent and put them in the empty ptree
-		// Ideally we could just replace the individual child but the data structure doesn't seem
-		// to support this very well when all keys in the ptree (ie. profiles.profile) are the same
-		// because the ptree iterators just don't seem to work correctly and documentation is very poor
-		for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
+	ptree pt;
+	pt.clear();
+
+	//Find and insert all children
+	for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
+	{
+		//If child is found
+		if(!it->second.m_parentProfile.compare(p.m_name))
 		{
-			if(!it->second.m_parentProfile.compare(parent.m_name))
+			//Update recursively downward if needed
+			if(down && m_profiles.keyExists(it->first))
 			{
-				pt.add_child("profile", it->second.m_tree);
+				if(!UpdateProfileTree(it->first, DOWN))
+				{
+					LOG(ERROR, "Updating profile tree for child NodeProfile '" + it->second.m_name + "' failed!", "");
+					return false;
+				}
 			}
+			//Put the child in the parent's ptree
+			pt.add_child("profile", m_profiles[it->first].m_tree);
 		}
-		//Replace the parent's profiles subtree (stores all children) with the new one
-		parent.m_tree.put_child("profiles", pt);
-		m_profiles[parent.m_name] = parent;
-		//Recursively ascend to update all ancestors
-		CreateProfileTree(parent.m_name);
-		UpdateProfileTree(parent.m_name, UP);
 	}
-	else if(!p.m_name.compare("default"))
+	//Replace the previous portion of the profiles ptree with the newly generated trees of the children
+	p.m_tree.put_child("profiles", pt);
+	//If we need to continue recursion upward to the root and haven't hit the terminating case of no parent/root
+	if(up && m_profiles.keyExists(p.m_parentProfile))
 	{
-		NodeProfile defaultProfile = m_profiles[p.m_name];
-		ptree pt;
-		pt.clear();
-
-		for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
+		if(!UpdateProfileTree(p.m_parentProfile, UP))
 		{
-			if(!it->second.m_parentProfile.compare(p.m_name))
-			{
-				pt.add_child("profile", it->second.m_tree);
-			}
+			LOG(ERROR, "Updating profile tree for parent NodeProfile '" + p.m_parentProfile + "' failed!", "");
+			return false;
 		}
-
-		p.m_tree.put_child("profiles", pt);
-		m_profiles[p.m_name] = defaultProfile;
-		CreateProfileTree(p.m_name);
 	}
 	return true;
 }
@@ -2721,14 +2675,25 @@ bool HoneydConfiguration::CreateProfileTree(string profileName)
 	{
 		return false;
 	}
-	NodeProfile p = m_profiles[profileName];
+	NodeProfile &p = m_profiles[profileName];
 	if(p.m_name.compare(""))
 	{
 		temp.put<string>("name", p.m_name);
 	}
 
 	temp.put<bool>("generated", p.m_generated);
-	temp.put<double>("distribution", p.m_distribution);
+	if(p.m_distribution < 0)
+	{
+		temp.put<double>("distribution", 0);
+	}
+	if(p.m_distribution > 100)
+	{
+		temp.put<double>("distribution", 100);
+	}
+	else
+	{
+		temp.put<double>("distribution", p.m_distribution);
+	}
 
 	if(p.m_tcpAction.compare("") && !p.m_inherited[TCP_ACTION])
 	{
@@ -2794,18 +2759,7 @@ bool HoneydConfiguration::CreateProfileTree(string profileName)
 	//put empty ptree in profiles as well because it is expected, does not matter that it is the same
 	// as the one in add.m_ports if profile has no ports, since both are empty.
 	temp.put_child("profiles", pt);
-
-	for(ProfileTable::iterator it = m_profiles.begin(); it != m_profiles.end(); it++)
-	{
-		if(!it->second.m_parentProfile.compare(profileName))
-		{
-			temp.add_child("profiles.profile", it->second.m_tree);
-		}
-	}
-
-	//copy the tree over and update ancestors
 	p.m_tree = temp;
-	m_profiles[profileName] = p;
 	return true;
 }
 

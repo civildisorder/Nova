@@ -153,7 +153,7 @@ bool PersonalityTree::GenerateProfiles(PersonalityNode *node, PersonalityNode *p
 
 	if(!node->m_redundant || (parent == &m_root) || (parent->m_children.size() != 1))
 	{
-		if(!m_hdconfig->AddProfile(&tempProf))
+		if(!m_hdconfig->AddProfile(tempProf))
 		{
 			LOG(ERROR, "Error adding " + tempProf.m_name, "");
 			return false;

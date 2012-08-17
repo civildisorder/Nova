@@ -218,36 +218,44 @@ public:
 	// Returns a string representation of MAC address or an empty string if the vendor is not valid
 	std::string GenerateUniqueMACAddress(std::string vendor);
 
+	//Inserts the profile into the HoneydConfiguration object
+	//	profile: pointer to the targetProfile you wish to insert
+	//	Returns true if the targetProfile could be inserted and false if it cannot.
+	bool AddProfile(NodeProfile &targetProfile);
+
     //***************** TO HERE *****************//
 
-	//Inserts the profile into the honeyd configuration
-	//	profile: pointer to the profile you wish to add
-	//	Returns (true) if the profile could be created, (false) if it cannot.
-	bool AddProfile(NodeProfile * profile);
 
 	bool AddGroup(std::string groupName);
 
 	std::vector<std::string> GetGroups();
 
+    //***************** REFACTORED FROM HERE *****************//
+
 	//Updates the profile with any modified information
 	//	Note: to modify inheritance use InheritProfile, just changing the parentProfile value and calling
-	//		this function may leave a copy of the profile as a child of the old parent next load
+	//		this function may leave a copy of the profile as a child in the old parent
 	bool UpdateProfile(std::string profileName)
 	{
-		CreateProfileTree(profileName);
 		return UpdateProfileTree(profileName, ALL);
 	}
 
+	//This function simply changes a profiles old name to the given new name
+	// oldName: name of the profile you wish to rename
+	// newName: the new name you wish to give a profile
+	// *Note: This function stands alone, you simply need to call it to save all changes.
     bool RenameProfile(std::string oldName, std::string newName);
 
     //Makes the profile named child inherit the profile named parent
     // child: the name of the child profile
     // parent: the name of the parent profile
-    // Returns: (true) if successful, (false) if either name could not be found
-    bool InheritProfile(std::string child, std::string parent);
+    // Returns true if successful and false if the function fails for some reason.
+    bool InheritProfile(std::string targetProfileName, std::string parentProfileName);
 
-    //Iterates over the profiles, recreating the entire property tree structure
-    void UpdateAllProfiles();
+    //Recreates the entire ptree structure by rebuilding from the root
+    // *Note: This function looks for the default profile and simply rebuilds the entire tree from there.
+    // Returns true if successful and false if the function fails for some reason.
+    bool UpdateAllProfiles();
 
 	//Removes a profile and all associated nodes from the Honeyd configuration
 	//	profileName: name of the profile you wish to delete
@@ -256,6 +264,8 @@ public:
     {
     	return Nova::HoneydConfiguration::DeleteProfile(profileName, true);
     }
+    //***************** TO HERE *****************//
+
 
     //Deletes a single node, called from deleteNodes();
     bool DeleteNode(std::string nodeName);
@@ -355,6 +365,8 @@ private:
     //Load stored honeyd nodes ptr
     bool LoadNodes(boost::property_tree::ptree *ptr);
 
+    //***************** REFACTORED FROM HERE *****************//
+
     //Removes a profile and all associated nodes from the Honeyd configuration
     //	profileName: name of the profile you wish to delete
     //	originalCall: used internally to designate the recursion's base condition, can old be set with
@@ -374,6 +386,9 @@ private:
     //		you must first call UpdateProfileTree(name, ALL);
     //	Returns (true) if successful and (false) if no profile with name 'profileName' exists
     bool CreateProfileTree(std::string profileName);
+
+    //***************** TO HERE *****************//
+
 
     std::string FindSubnet(in_addr_t ip);
 

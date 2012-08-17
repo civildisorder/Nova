@@ -155,7 +155,7 @@ struct NodeProfile
 		}
 		else
 		{
-			this->m_ethernetVendors.push_back(std::pair<std::string, double>(ethernet, 0));
+			this->m_ethernetVendors.push_back(std::pair<std::string, double>(ethernet, 100));
 			return true;
 		}
 	}

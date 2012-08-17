@@ -2534,7 +2534,7 @@ void NovaConfig::on_actionProfileAdd_triggered()
 		}
 	}
 	//Puts the profile in the table, creates a ptree and loads the new configuration
-	m_honeydConfig->AddProfile(&temp);
+	m_honeydConfig->AddProfile(temp);
 	m_loading->unlock();
 	LoadAllProfiles();
 	LoadAllNodes();
