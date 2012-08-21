@@ -20,6 +20,7 @@
 #include "../Logger.h"
 
 #include <math.h>
+#include <set>
 #include <boost/algorithm/string.hpp>
 
 using namespace std;
@@ -294,7 +295,7 @@ bool NodeManager::GenerateNodes(int num_nodes)
 							{
 								addPort += "reset";
 								newPort.m_behavior = "reset";
-								curNode.m_ports.push_back(addPort);
+								curNode.m_ports.insert(addPort);
 								curNode.m_isPortInherited.push_back(false);
 								newPort.m_portName = addPort;
 
@@ -306,7 +307,7 @@ bool NodeManager::GenerateNodes(int num_nodes)
 						addPort += "block";
 						newPort.m_behavior = "block";
 
-						curNode.m_ports.push_back(addPort);
+						curNode.m_ports.insert(addPort);
 						curNode.m_isPortInherited.push_back(false);
 						newPort.m_portName = addPort;
 
@@ -316,7 +317,7 @@ bool NodeManager::GenerateNodes(int num_nodes)
 
 					//If we use the port behavior from the parent profile
 					curCounter->m_count -= (1 - curCounter->m_increment);
-					curNode.m_ports.push_back(curCounter->m_portName);
+					curNode.m_ports.insert(curCounter->m_portName);
 					curNode.m_isPortInherited.push_back(true);
 					num_ports++;
 				}
@@ -360,7 +361,7 @@ bool NodeManager::GenerateNodes(int num_nodes)
 							newPort.m_portName = addPort;
 							m_hdconfig->AddPort(newPort);
 
-							curNode.m_ports.push_back(addPort);
+							curNode.m_ports.insert(addPort);
 							curNode.m_isPortInherited.push_back(false);
 							continue;
 						}
@@ -371,7 +372,7 @@ bool NodeManager::GenerateNodes(int num_nodes)
 					newPort.m_portName = addPort;
 					m_hdconfig->AddPort(newPort);
 
-					curNode.m_ports.push_back(addPort);
+					curNode.m_ports.insert(addPort);
 					curNode.m_isPortInherited.push_back(false);
 				}
 				// Only progress the outermost for loop if we've completely generated a
@@ -467,12 +468,12 @@ bool NodeManager::RemoveNodes(int num_nodes)
 			}
 
 			//Track ports
-			for(unsigned int j = 0; j < lastNode->m_ports.size(); j++)
+			for (set<string>::iterator it = lastNode->m_ports.begin(); it != lastNode->m_ports.end(); it++)
 			{
-				Port *curPort = m_hdconfig->GetPort(lastNode->m_ports[j]);
+				Port *curPort = m_hdconfig->GetPort((*it));
 				if(curPort == NULL)
 				{
-					LOG(ERROR, "Unable to find expected Port " + lastNode->m_ports[j] + ".", "");
+					LOG(ERROR, "Unable to find expected Port " + (*it) + ".", "");
 					return false;
 				}
 				for(unsigned int k = 0; k < pCounter->m_portCounters.size(); k++)
@@ -565,12 +566,12 @@ bool NodeManager::RemoveNodes(int num_nodes)
 				continue;
 			}
 			//Track ports
-			for(unsigned int j = 0; j < lastNode->m_ports.size(); j++)
+			for (set<string>::iterator it = lastNode->m_ports.begin(); it != lastNode->m_ports.end(); it++)
 			{
-				Port *curPort = m_hdconfig->GetPort(lastNode->m_ports[j]);
+				Port *curPort = m_hdconfig->GetPort((*it));
 				if(curPort == NULL)
 				{
-					LOG(ERROR, "Unable to find expected Port " + lastNode->m_ports[j] + ".", "");
+					LOG(ERROR, "Unable to find expected Port " + (*it) + ".", "");
 					continue;
 				}
 				for(unsigned int k = 0; k < pCounter->m_portCounters.size(); k++)
@@ -804,12 +805,12 @@ bool NodeManager::AdjustProfiles(int targetNodeCount)
 
 			//Find the node to remove
 			Node *curNode = NULL;
-			for(unsigned int i = 0; i < highProf->m_nodeKeys.size(); i++)
+			for (set<string>::iterator it = highProf->m_nodeKeys.begin(); it != highProf->m_nodeKeys.end(); it++)
 			{
-				curNode = &m_hdconfig->m_nodes[highProf->m_nodeKeys[i]];
+				curNode = &m_hdconfig->m_nodes[(*it)];
 				if(curNode == NULL)
 				{
-					LOG(ERROR, "Unable to retrieve expected node in node profile '" + highProf->m_nodeKeys[i] + "'.", "");
+					LOG(ERROR, "Unable to retrieve expected node in node profile '" + (*it) + "'.", "");
 					return false;
 				}
 
@@ -857,12 +858,13 @@ bool NodeManager::AdjustProfiles(int targetNodeCount)
 							LOG(ERROR, "Unable to retrieve expected port '" + lowCounter->m_portCounters[j].m_portName + "'.", "");
 							return false;
 						}
-						for(unsigned int k = 0; k < curNode->m_ports.size(); k++)
+
+						for (set<string>::iterator it = curNode->m_ports.begin(); it != curNode->m_ports.end(); it++)
 						{
-							Port *curPort = &m_hdconfig->m_ports[curNode->m_ports[k]];
+							Port *curPort = &m_hdconfig->m_ports[(*it)];
 							if(curPort == NULL)
 							{
-								LOG(ERROR, "Unable to retrieve expected port '" + curNode->m_ports[k] + "'.", "");
+								LOG(ERROR, "Unable to retrieve expected port '" + (*it) + "'.", "");
 								return false;
 							}
 
@@ -870,7 +872,7 @@ bool NodeManager::AdjustProfiles(int targetNodeCount)
 							if((!curPort->m_type.compare(lowPort->m_type)) && (!curPort->m_portNum.compare(lowPort->m_portNum)))
 							{
 								//If the node used this port
-								if(!curPort->m_portName.compare(curNode->m_ports[k]))
+								if(!curPort->m_portName.compare((*it)))
 								{
 									lowCounter->m_portCounters[j].m_count += (1 - lowCounter->m_portCounters[j].m_increment);
 								}
@@ -896,7 +898,7 @@ bool NodeManager::AdjustProfiles(int targetNodeCount)
 						if(highCounter->m_portCounters[j].m_count > 0)
 						{
 							highCounter->m_portCounters[j].m_count -= (1 - highCounter->m_portCounters[j].m_increment);
-							curNode->m_ports.push_back(curPort->m_portName);
+							curNode->m_ports.insert(curPort->m_portName);
 							curNode->m_isPortInherited.push_back(true);
 						}
 						else
@@ -917,7 +919,7 @@ bool NodeManager::AdjustProfiles(int targetNodeCount)
 								curPort->m_behavior = portAction;
 								m_hdconfig->AddPort(newPort);
 							}
-							curNode->m_ports.push_back(portString+portAction);
+							curNode->m_ports.insert(portString+portAction);
 							curNode->m_isPortInherited.push_back(false);
 						}
 					}
@@ -1012,9 +1014,9 @@ bool NodeManager::AdjustMACVendors(ProfileCounter *targetProfile)
 		{
 			break;
 		}
-		for(unsigned int j = 0; j < curProfile->m_nodeKeys.size(); j++)
+		for (set<string>::iterator it = curProfile->m_nodeKeys.begin(); it != curProfile->m_nodeKeys.end(); it++)
 		{
-			Node *curNode = &m_hdconfig->m_nodes[curProfile->m_nodeKeys[j]];
+			Node *curNode = &m_hdconfig->m_nodes[(*it)];
 			if(curNode == NULL)
 			{
 				LOG(ERROR, "Unable to retrieve expected node in target profile '" + targetProfile->m_profile.m_name + "'.", "");
@@ -1084,23 +1086,32 @@ bool NodeManager::AdjustPortsOnNodes(ProfileCounter *targetProfile)
 			break;
 		}
 		bool foundMatch = false;
-		for(unsigned int j = 0; j < curProfile->m_nodeKeys.size(); j++)
+		for (set<string>::iterator nodeIter = curProfile->m_nodeKeys.begin(); nodeIter != curProfile->m_nodeKeys.end(); nodeIter++)
 		{
-			Node *curNode = &m_hdconfig->m_nodes[curProfile->m_nodeKeys[j]];
-			for(unsigned int k = 0; k < curNode->m_ports.size(); k++)
+			Node *curNode = &m_hdconfig->m_nodes[(*nodeIter)];
+			vector<string> portsToInsert;
+			for (set<string>::iterator portIter = curNode->m_ports.begin(); portIter != curNode->m_ports.end(); portIter++)
 			{
-				Port *nodePort = &m_hdconfig->m_ports[curNode->m_ports[k]];
+				Port *nodePort = &m_hdconfig->m_ports[(*portIter)];
 
 				//If this port is a match
-				if(!curNode->m_ports[k].compare(lowPort->m_portName))
+				if(!(*portIter).compare(lowPort->m_portName))
 				{
 					string behaviorStr = "reset";
-					curNode->m_ports[k] = nodePort->m_portNum + "_" + nodePort->m_type + "_" + behaviorStr;
-					curNode->m_isPortInherited[k] = false;
+					portsToInsert.push_back(nodePort->m_portNum + "_" + nodePort->m_type + "_" + behaviorStr);
+					curNode->m_ports.erase(portIter);
+
+					// TODO FIX TODO
+					//curNode->m_isPortInherited[k] = false;
 					// -= 1 - m_increment for port addition, -= m_increment for removing a blocked port
 					lowPCounter->m_count--;
 					foundMatch = true;
 				}
+			}
+
+			for (uint i = 0; i < portsToInsert.size(); i++)
+			{
+				curNode->m_ports.insert(portsToInsert.at(i));
 			}
 		}
 		//If the vendor is still under allocated
@@ -1123,27 +1134,37 @@ bool NodeManager::AdjustPortsOnNodes(ProfileCounter *targetProfile)
 			break;
 		}
 		bool foundMatch = false;
-		for(unsigned int j = 0; j < curProfile->m_nodeKeys.size(); j++)
+		for (set<string>::iterator nodeIter = curProfile->m_nodeKeys.begin(); nodeIter != curProfile->m_nodeKeys.end(); nodeIter++)
 		{
-			Node *curNode = &m_hdconfig->m_nodes[curProfile->m_nodeKeys[j]];
-			for(unsigned int k = 0; k < curNode->m_ports.size(); k++)
+			Node *curNode = &m_hdconfig->m_nodes[(*nodeIter)];
+			vector<string> portsToInsert;
+			for (set<string>::iterator portIter = curNode->m_ports.begin(); portIter != curNode->m_ports.end(); portIter++)
 			{
-				Port *nodePort = &m_hdconfig->m_ports[curNode->m_ports[k]];
+				Port *nodePort = &m_hdconfig->m_ports[(*portIter)];
 
 				//If this port is a match
-				if(!curNode->m_ports[k].compare(highPort->m_portName))
+				if(!(*portIter).compare(highPort->m_portName))
 				{
 					string behaviorStr = "block";
 					if((!nodePort->m_type.compare("TCP")) && (!curProfile->m_tcpAction.compare("reset")))
 					{
 						behaviorStr = "reset";
 					}
-					curNode->m_ports[k] = nodePort->m_portNum + "_" + nodePort->m_type + "_" + behaviorStr;
-					curNode->m_isPortInherited[k] = false;
+
+					portsToInsert.push_back(nodePort->m_portNum + "_" + nodePort->m_type + "_" + behaviorStr);
+					curNode->m_ports.erase(portIter);
+
+					// TODO FIX TODO
+					//curNode->m_isPortInherited[k] = false;
+
 					// += m_increment for blocking port , += (1-m_increment) for removing a used port
 					highPCounter->m_count++;
 					foundMatch = true;
 				}
+			}
+			for (uint i = 0; i < portsToInsert.size(); i++)
+			{
+				curNode->m_ports.insert(portsToInsert.at(i));
 			}
 		}
 		//If the vendor is still over allocated

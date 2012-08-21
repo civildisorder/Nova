@@ -24,6 +24,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <arpa/inet.h>
 #include <string>
+#include <set>
 
 /*********************************************************************
  - Structs and Tables for quick item access through pointers -
@@ -109,7 +110,7 @@ struct Subnet
 	in_addr_t m_max;
 	bool m_enabled;
 	bool m_isRealDevice;
-	std::vector<std::string> m_nodes;
+	std::set<std::string> m_nodes;
 	boost::property_tree::ptree m_tree;
 };
 
@@ -133,7 +134,7 @@ struct NodeProfile
 	bool m_generated;
 	double m_distribution;
 	std::vector<std::pair<std::string, std::pair<bool, double> > > m_ports;
-	std::vector<std::string> m_nodeKeys;
+	std::set<std::string> m_nodeKeys;
 	std::string m_parentProfile;
 	boost::property_tree::ptree m_tree;
 
@@ -286,7 +287,7 @@ struct Node
 	std::string m_sub;
 	std::string m_interface;
 	std::string m_pfile;
-	std::vector<std::string> m_ports;
+	std::set<std::string> m_ports;
 	std::vector<bool> m_isPortInherited;
 	std::string m_IP;
 	std::string m_MAC;

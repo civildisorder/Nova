@@ -819,7 +819,7 @@ bool HoneydConfiguration::AddNewNode(string profileName, string ipAddress, strin
 	//Assign Ports
 	for(uint i = 0; i < p->m_ports.size(); i++)
 	{
-		newNode.m_ports.push_back(p->m_ports[i].first);
+		newNode.m_ports.insert(p->m_ports[i].first);
 		newNode.m_isPortInherited.push_back(false);
 	}
 
@@ -832,8 +832,8 @@ bool HoneydConfiguration::AddNewNode(string profileName, string ipAddress, strin
 	}
 
 	//Assign all the values
-	subPtr->m_nodes.push_back(newNode.m_name);
-	p->m_nodeKeys.push_back(newNode.m_name);
+	subPtr->m_nodes.insert(newNode.m_name);
+	p->m_nodeKeys.insert(newNode.m_name);
 	m_nodes[newNode.m_name] = newNode;
 
 	LOG(DEBUG, "Added new node '" + newNode.m_name + "'.", "");
@@ -866,8 +866,8 @@ bool HoneydConfiguration::AddPreGeneratedNode(Node &newNode)
 		return false;
 	}
 
-	subPtr->m_nodes.push_back(newNode.m_name);
-	profPtr->m_nodeKeys.push_back(newNode.m_name);
+	subPtr->m_nodes.insert(newNode.m_name);
+	profPtr->m_nodeKeys.insert(newNode.m_name);
 	m_nodes[newNode.m_name] = newNode;
 
 	LOG(DEBUG, "Added new node '" + newNode.m_name + "'.", "");
@@ -1854,7 +1854,7 @@ bool HoneydConfiguration::LoadNodeKeys()
 			LOG(ERROR, "Unable to locate node profile '" + it->second.m_pfile + "'!", "");
 			return false;
 		}
-		p->m_nodeKeys.push_back(it->first);
+		p->m_nodeKeys.insert(it->first);
 	}
 	return true;
 }
@@ -2009,20 +2009,22 @@ bool HoneydConfiguration::LoadNodes(ptree *propTree)
 					LoadProfileServices(&nodePorts, &nodeProf);
 					for(uint i = 0; i < nodeProf.m_ports.size(); i++)
 					{
-						node.m_ports.push_back(nodeProf.m_ports[i].first);
+						node.m_ports.insert(nodeProf.m_ports[i].first);
 						node.m_isPortInherited.push_back(false);
 					}
 					//Loads inherited ports and checks for inheritance conflicts
 					if(m_profiles.keyExists(node.m_pfile))
 					{
 						vector <pair <string, pair <bool, double> > > profilePorts = m_profiles[node.m_pfile].m_ports;
+
+
 						for(uint i = 0; i < profilePorts.size(); i++)
 						{
 							bool conflict = false;
 							Port curPort = m_ports[profilePorts[i].first];
-							for(uint j = 0; j < node.m_ports.size(); j++)
+							for(set<string>::iterator it = node.m_ports.begin(); it != node.m_ports.end(); it++)
 							{
-								Port nodePort = m_ports[node.m_ports[j]];
+								Port nodePort = m_ports[(*it)];
 								if(!(curPort.m_portNum.compare(nodePort.m_portNum))
 									&& !(curPort.m_type.compare(nodePort.m_type)))
 								{
@@ -2032,7 +2034,7 @@ bool HoneydConfiguration::LoadNodes(ptree *propTree)
 							}
 							if(!conflict)
 							{
-								node.m_ports.push_back(profilePorts[i].first);
+								node.m_ports.insert(profilePorts[i].first);
 								node.m_isPortInherited.push_back(true);
 							}
 						}
@@ -2049,7 +2051,7 @@ bool HoneydConfiguration::LoadNodes(ptree *propTree)
 					m_nodes[node.m_name] = node;
 
 					//Put address of saved node in subnet's list of nodes.
-					m_subnets[m_nodes[node.m_name].m_sub].m_nodes.push_back(node.m_name);
+					m_subnets[m_nodes[node.m_name].m_sub].m_nodes.insert(node.m_name);
 				}
 				else
 				{
@@ -2076,7 +2078,7 @@ bool HoneydConfiguration::LoadNodes(ptree *propTree)
 						if(node.m_sub != "")
 						{
 							//Put address of saved node in subnet's list of nodes.
-							m_subnets[node.m_sub].m_nodes.push_back(node.m_name);
+							m_subnets[node.m_sub].m_nodes.insert(node.m_name);
 						}
 						//If no subnet found, can't use node unless it's doppelganger.
 						else
@@ -2095,7 +2097,7 @@ bool HoneydConfiguration::LoadNodes(ptree *propTree)
 						}
 
 						//Put address of saved node in subnet's list of nodes.
-						m_subnets[node.m_sub].m_nodes.push_back(node.m_name);
+						m_subnets[node.m_sub].m_nodes.insert(node.m_name);
 					}
 				}
 
@@ -2355,13 +2357,7 @@ bool HoneydConfiguration::DeleteNode(string nodeName)
 	}
 
 	//Update the Subnet
-	for(uint i = 0; i < subPtr->m_nodes.size(); i++)
-	{
-		if(!subPtr->m_nodes[i].compare(nodeName))
-		{
-			subPtr->m_nodes.erase(subPtr->m_nodes.begin() + i);
-		}
-	}
+	subPtr->m_nodes.erase(nodeName);
 
 	// Make sure the profile exists
 	NodeProfile *profPtr = NULL;
@@ -2380,13 +2376,8 @@ bool HoneydConfiguration::DeleteNode(string nodeName)
 		return false;
 	}
 
-	for(uint i = 0; i < profPtr->m_nodeKeys.size(); i++)
-	{
-		if(!profPtr->m_nodeKeys[i].compare(nodeName))
-		{
-			profPtr->m_nodeKeys.erase(profPtr->m_nodeKeys.begin() + i);
-		}
-	}
+	profPtr->m_nodeKeys.erase(nodeName);
+
 	//Delete the node
 	m_nodes.erase(nodeName);
 	return true;
@@ -2969,22 +2960,23 @@ bool HoneydConfiguration::UpdateNodeMacs(std::string profileName)
 
 	NodeProfile updateNodes = m_profiles[profileName];
 
-	vector<string> nodesToUpdate = updateNodes.m_nodeKeys;
+	set<string> nodesToUpdate = updateNodes.m_nodeKeys;
 
-	for(uint i = 0; i < nodesToUpdate.size(); i++)
+	//for(uint i = 0; i < nodesToUpdate.size(); i++)
+	for(set<string>::iterator it = nodesToUpdate.begin(); it != nodesToUpdate.begin(); it++)
 	{
-		if(m_nodes.keyExists(nodesToUpdate[i]))
+		if(m_nodes.keyExists((*it)))
 		{
-			Node update = m_nodes[nodesToUpdate[i]];
+			Node update = m_nodes[(*it)];
 			update.m_MAC = m_macAddresses.GenerateRandomMAC(updateNodes.GetRandomVendor());
 			update.m_name = update.m_IP + " - " + update.m_MAC;
 
 			if(!m_nodes.keyExists(update.m_name))
 			{
-				m_nodes.erase(nodesToUpdate[i]);
+				m_nodes.erase((*it));
 				m_nodes[update.m_name] = update;
-				nodesToUpdate.erase(nodesToUpdate.begin() + i);
-				nodesToUpdate.insert(nodesToUpdate.begin() + i, update.m_name);
+				nodesToUpdate.erase(it);
+				nodesToUpdate.insert(it, update.m_name);
 			}
 			else
 			{
