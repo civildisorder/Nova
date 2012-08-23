@@ -5,7 +5,6 @@ block headerAdditions
 
   script
     var grid;
-    var names = [];
     
     function ipTypeChanged() {
       var ipEditEnabled;
@@ -26,6 +25,7 @@ block headerAdditions
       // about it, if that doesn't bear any fruit than we may have to 
       // move away from a DataGrid and try something else.
       var items = grid.selection.getSelected();
+      var names = [];
       
       dojo.forEach(items, function(selectedItem) {
         names.push(grid.store.getValues(selectedItem, "Name"));
@@ -177,6 +177,7 @@ block content
   br
   form(method="post", action="/editHoneydNodesSave")
     h2 Create Honeyd Nodes
+    //input(type='hidden', name='subnet', id='subnet', value='')
     label Profile
     select(name="profile")
       each profile, i in profiles
