@@ -17,12 +17,6 @@ set -e
 
 trap cleanup SIGINT
 
-#Assert root user
-if [ $USER != "root" ]; then
-	echo "Execute with root privileges: sudo $0"
-	exit 1
-fi
-
 echo -e "Remember to update debian/changelog with current version and notes."
 
 if [ -z $1 ]; then

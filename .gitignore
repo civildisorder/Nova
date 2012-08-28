@@ -141,6 +141,7 @@ NovaLibrary/libNovaLibrary.a
 #debian
 /nova_1*
 /debian/nova.postinst.debhelper
+/debian/nova.prerm.debhelper
 /debian/nova.postrm.debhelper
 /debian/nova.substvars
 debian/files
