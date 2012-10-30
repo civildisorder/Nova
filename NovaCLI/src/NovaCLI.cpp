@@ -46,6 +46,11 @@ int main(int argc, const char *argv[])
 	Logger::Inst()->SetUserLogPreferences(LIBNOTIFY, EMERGENCY, '+');
 	Logger::Inst()->SetUserLogPreferences(EMAIL, EMERGENCY, '+');
 
+	if (!strcmp(argv[argc - 1], "--disable-logging"))
+	{
+		Logger::Inst()->SetUserLogPreferences(SYSLOG, EMERGENCY, '+');
+	}
+
 	// We parse the input arguments here,
 	// but refer to other functions to do any
 	// actual work.
@@ -457,7 +462,20 @@ void StatusHaystackWrapper()
 
 bool StatusQuasar()
 {
-	return system("forever list");
+	FILE *f;
+	f = popen("forever list | grep /usr/share/nova/sharedFiles/Quasar/main.js", "r");
+
+	char buffer[10];
+
+	if (fgets(buffer, sizeof(buffer), f))
+	{
+		cout << "Quasar Status: Running" << endl;
+	}
+	else
+	{
+		cout << "Quasar Status: Not running" << endl;
+	}
+	pclose(f);
 }
 
 void StartNovaWrapper(bool debug)
